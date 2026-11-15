@@ -870,7 +870,7 @@ function startApp() {
     logIssue("MYN-WEB-AUTH-001","Oturum", "Firebase oturum durumu okunamadı.",error?.code || "");
     appRoot.innerHTML = '<section class="card"><h2>Hesap bağlantısı kurulamadı</h2><p>İnternet bağlantını ve Firebase yapılandırmasını kontrol et.</p></section>';
   });
-  setInterval(()=>{ if(state.page==="devices" || state.page==="remote" || state.page==="home") render(); },15_000);
+  // Firestore onSnapshot updates device/status UI. Avoid periodic rerenders while typing.
 }
 
 let auth;
@@ -912,7 +912,7 @@ document.addEventListener("click", async event => {
     else if (action === "request-microphone") { await requestPermission("microphone"); }
     else if (action === "request-camera") { await requestPermission("camera"); }
     else if (action === "request-notifications") { await requestPermission("notifications"); }
-    else if (action === "toggle-screen") { state.remoteScreenEnabled=!state.remoteScreenEnabled; render(); }
+    else if (action === "toggle-screen") { state.remoteScreenEnabled=!state.remoteScreenEnabled; if (state.remoteScreenEnabled) startScreenPreview(); else stopScreenPreview(); render(); }
     else if (action === "focus-remote-keyboard") { document.getElementById("remote-keyboard-input")?.focus(); }
     else if (action === "remote-backspace") {
       const d=currentDevice(); await enqueueCommand(d,"key_backspace",{});
@@ -1035,3 +1035,8 @@ window.addEventListener("unhandledrejection",event=>{
 window.addEventListener("beforeunload",()=>stopScreenPreview());
 
 startApp();
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("./service-worker.js").catch(error => {
+    logIssue("MYN-WEB-PWA-001", "Çevrimdışı uygulama", "Uygulama kabuğu kaydedilemedi.", error?.message || "");
+  });
+}
