@@ -56,14 +56,29 @@ const ICONS = {
 };
 
 const appRoot = document.getElementById("app");
+function storageGet(key, fallback = "") {
+  try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, String(value)); } catch {}
+}
+function storageRemove(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
+function loadLogs() {
+  try {
+    const value = JSON.parse(storageGet("myn-web-logs", "[]"));
+    return Array.isArray(value) ? value.slice(0, 80) : [];
+  } catch { return []; }
+}
 const state = {
   user: null, page: "home", settingsTab: "Genel", authMode: "login",
-  theme: localStorage.getItem("myn-theme") || "dark", drawerOpen: false,
+  theme: storageGet("myn-theme", "dark"), drawerOpen: false,
   devices: [], devicesLoading: false, devicesError: "",
   profile: null, profileBusy: false, profileMessage: "",
-  selectedDeviceId: localStorage.getItem("myn-selected-device") || "",
+  selectedDeviceId: storageGet("myn-selected-device", ""),
   commandTargetId: "AUTO", commandText: "", busy: false, activeCommandId: "",
-  feedback: "", logs: JSON.parse(localStorage.getItem("myn-web-logs") || "[]"),
+  feedback: "", logs: loadLogs(),
   fileListing: null, filesDeviceId: "", filesLoading: false,
   filePath: "", remoteScreenEnabled: true, speechBusy: false,
   speechRecognition: null, screenPulse: null, deviceUnsubscribe: null,
@@ -107,7 +122,7 @@ function currentDevice() {
 function logIssue(code, title, message, details = "") {
   const entry = { id: code, title, message, details, at: new Date().toISOString() };
   state.logs = [entry, ...state.logs].slice(0, 80);
-  localStorage.setItem("myn-web-logs", JSON.stringify(state.logs));
+  storageSet("myn-web-logs", JSON.stringify(state.logs));
   showToast(message);
   return message;
 }
@@ -125,7 +140,7 @@ function showToast(message) {
 }
 function setTheme(theme) {
   state.theme = theme;
-  localStorage.setItem("myn-theme", theme);
+  storageSet("myn-theme", theme);
   document.body.classList.toggle("light-theme", theme === "light");
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = theme === "light" ? "#f5f6fa" : "#0b0d14";
@@ -513,7 +528,7 @@ function subscribeDevices() {
     const chosen = pcDevices().find(d=>d.id===state.selectedDeviceId);
     if (!chosen) {
       state.selectedDeviceId = currentDevice()?.id || "";
-      if (state.selectedDeviceId) localStorage.setItem("myn-selected-device", state.selectedDeviceId);
+      if (state.selectedDeviceId) storageSet("myn-selected-device", state.selectedDeviceId);
     }
     render();
   }, error => {
@@ -904,7 +919,7 @@ document.addEventListener("click", async event => {
     }
     else if (action === "refresh-devices") { subscribeDevices(); }
     else if (action === "select-device") {
-      state.selectedDeviceId=button.dataset.id; localStorage.setItem("myn-selected-device",state.selectedDeviceId);
+      state.selectedDeviceId=button.dataset.id; storageSet("myn-selected-device",state.selectedDeviceId);
       showToast("Cihaz seçildi."); render();
     }
     else if (action === "rename-device") { await updateDeviceName(button.dataset.id); }
@@ -943,7 +958,7 @@ document.addEventListener("click", async event => {
     }
     else if (action === "files-upload") { document.getElementById("files-upload-input")?.click(); }
     else if (action === "clear-logs") {
-      if (confirm("Web hata kayıtları temizlensin mi?")) { state.logs=[]; localStorage.removeItem("myn-web-logs"); render(); }
+      if (confirm("Web hata kayıtları temizlensin mi?")) { state.logs=[]; storageRemove("myn-web-logs"); render(); }
     }
     else if (action === "export-logs") { downloadTextFile("mynassistant-web-logs.json",JSON.stringify(state.logs,null,2)); }
   } catch(error) {
@@ -973,7 +988,7 @@ document.addEventListener("submit", async event => {
 document.addEventListener("change", async event => {
   const el=event.target;
   if (el.id==="remote-device") {
-    state.selectedDeviceId=el.value; localStorage.setItem("myn-selected-device",el.value);
+    state.selectedDeviceId=el.value; storageSet("myn-selected-device",el.value);
     if(state.page==="remote") { stopScreenPreview(); startScreenPreview(); }
     render();
   } else if (el.id==="files-device") {
