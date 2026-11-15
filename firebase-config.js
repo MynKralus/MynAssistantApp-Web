@@ -7,7 +7,9 @@ export const firebaseConfig = Object.freeze({
   authDomain: "myncloud-24.firebaseapp.com",
   projectId: "myncloud-24",
   storageBucket: "myncloud-24.firebasestorage.app",
-  messagingSenderId: "994290744643"
+  messagingSenderId: "994290744643",
+  // Firebase Console → Project settings → Your apps → Web SDK config.
+  appId: ""
 });
 
 export const SERVER_BASE_URL = "https://mynassistant-server.onrender.com";
