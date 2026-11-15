@@ -32,6 +32,35 @@ jobs:
       - name: Validate PWA manifest
         run: python -m json.tool manifest.webmanifest > /dev/null
 
+      - name: Generate Android and browser PNG icons from the exact MynAssistant logo
+        run: |
+          set -euo pipefail
+          python -m pip install --quiet Pillow
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          source = Path("mynassistant-logo.webp")
+          if not source.is_file():
+              raise SystemExit("The owner-provided MynAssistant logo is missing.")
+
+          with Image.open(source) as opened:
+              if opened.format != "WEBP" or opened.size != (512, 512):
+                  raise SystemExit("The canonical MynAssistant logo has an unexpected format or dimensions.")
+              image = opened.convert("RGBA")
+              for size, filename in (
+                  (192, "mynassistant-icon-192.png"),
+                  (512, "mynassistant-icon-512.png"),
+              ):
+                  image.resize((size, size), Image.Resampling.LANCZOS).save(
+                      filename, format="PNG", optimize=True
+                  )
+                  with Image.open(filename) as check:
+                      if check.format != "PNG" or check.size != (size, size):
+                          raise SystemExit(f"Invalid browser icon generated: {filename}")
+                  print(f"Generated {filename}")
+          PY
+
       - name: Verify web entry points
         run: |
           test -s index.html
@@ -39,6 +68,8 @@ jobs:
           test -s app.js
           test -s firebase-config.js
           test -s mynassistant-logo.webp
+          test -s mynassistant-icon-192.png
+          test -s mynassistant-icon-512.png
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
