@@ -7,3 +7,8 @@
 - `MynAssistant-Server` ayrı bir yönetici/API projesidir. Render'daki yönetici paneli ve servis hesabı bu web sitesine taşınmaz; web uygulaması yönetici parolası veya servis hesabı istemez.
 - PC Kumandası sayfası oturum açmadan görüntülenebilir. Ancak mevcut Android/Windows Agent bulut protokolünde cihaz sahipliği `ownerId` ve Firebase UID ile doğrulanır. Bu nedenle uzaktan komut göndermek için kullanıcının kendi MynAssistant hesabında oturum açması gerekir.
 - Google girişi `GoogleAuthProvider` ile Firebase Authentication'a bağlanır. Bunun çalışması için aynı Firebase projesine ayrı bir Web app kaydı eklenmeli, onun Web `appId` değeri kullanılmalı, Google sağlayıcısı etkin olmalı ve `mynkralus.github.io` Authentication → Authorized domains listesine eklenmelidir.
+
+
+## Marka görseli
+
+Ana sayfa avatarı, başlık simgesi, favicon ve PWA simgesi `mynassistant-logo.webp` dosyasını kullanır. Bu dosya proje sahibi tarafından sağlanan mavi MynAssistant logosunun beyaz zemini korunarak WebP biçimine dönüştürülmüş sürümüdür. Yayın iş akışı logoyu başka bir depodan indirmez veya yeniden çizmez.

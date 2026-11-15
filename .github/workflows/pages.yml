@@ -32,83 +32,13 @@ jobs:
       - name: Validate PWA manifest
         run: python -m json.tool manifest.webmanifest > /dev/null
 
-      - name: Download and prepare the original MynAssistant logo
-        run: |
-          set -euo pipefail
-          curl --fail --location --retry 3 --retry-delay 2 \
-            "https://raw.githubusercontent.com/Kralus-Holding/MynAI-DotNet/main/assets/branding/mynassistant-icon-source.png" \
-            --output /tmp/mynassistant-icon-source.png
-          python -m pip install --quiet Pillow
-          python - <<'PY'
-          from pathlib import Path
-          from PIL import Image, ImageOps
-
-          source = Path("/tmp/mynassistant-icon-source.png")
-          target = Path("mynassistant-logo.png")
-          with Image.open(source) as opened:
-              rgba = opened.convert("RGBA")
-              if rgba.width < 64 or rgba.height < 64:
-                  raise SystemExit("MynAssistant source logo is unexpectedly small.")
-
-              # Match the desktop branding pipeline: remove only edge-connected
-              # near-white background pixels, preserving white details inside the mark.
-              pixels = rgba.load()
-              width, height = rgba.size
-              visited = bytearray(width * height)
-              stack = []
-
-              def is_background(index):
-                  x, y = index % width, index // width
-                  r, g, b, a = pixels[x, y]
-                  return a > 0 and min(r, g, b) >= 220 and max(r, g, b) - min(r, g, b) <= 35
-
-              def add(x, y):
-                  index = y * width + x
-                  if not visited[index] and is_background(index):
-                      visited[index] = 1
-                      stack.append(index)
-
-              for x in range(width):
-                  add(x, 0)
-                  add(x, height - 1)
-              for y in range(height):
-                  add(0, y)
-                  add(width - 1, y)
-
-              while stack:
-                  index = stack.pop()
-                  x, y = index % width, index // width
-                  if x: add(x - 1, y)
-                  if x + 1 < width: add(x + 1, y)
-                  if y: add(x, y - 1)
-                  if y + 1 < height: add(x, y + 1)
-
-              for index, remove in enumerate(visited):
-                  if remove:
-                      x, y = index % width, index // width
-                      r, g, b, _ = pixels[x, y]
-                      pixels[x, y] = (r, g, b, 0)
-
-              contained = ImageOps.contain(rgba, (512, 512), method=Image.Resampling.LANCZOS)
-              square = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
-              square.alpha_composite(contained, ((512 - contained.width) // 2, (512 - contained.height) // 2))
-              square.save(target, format="PNG", optimize=True)
-
-          with Image.open(target) as result:
-              if result.format != "PNG" or result.size != (512, 512) or result.mode != "RGBA":
-                  raise SystemExit("Prepared MynAssistant logo failed validation.")
-              if result.getchannel("A").getextrema()[0] != 0:
-                  raise SystemExit("Prepared MynAssistant logo has no transparent background.")
-          print(f"Prepared official repository logo: {target} ({target.stat().st_size} bytes)")
-          PY
-
       - name: Verify web entry points
         run: |
           test -s index.html
           test -s styles.css
           test -s app.js
           test -s firebase-config.js
-          test -s mynassistant-logo.png
+          test -s mynassistant-logo.webp
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

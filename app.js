@@ -171,7 +171,7 @@ function renderDrawer() {
     <div class="drawer-backdrop ${state.drawerOpen ? "" : "hidden"}" data-action="drawer-close"></div>
     <aside class="drawer ${state.drawerOpen ? "open" : ""}" aria-label="Uygulama menüsü">
       <div class="drawer-account">
-        ${user?.photoURL ? `<img class="avatar" src="${esc(user.photoURL)}" alt="Profil fotoğrafı" referrerpolicy="no-referrer">` : `<img class="avatar" src="./mynassistant-logo.png" alt="MynAssistant logosu">`}
+        ${user?.photoURL ? `<img class="avatar" src="${esc(user.photoURL)}" alt="Profil fotoğrafı" referrerpolicy="no-referrer">` : `<img class="avatar" src="./mynassistant-logo.webp" alt="MynAssistant logosu">`}
         <div class="drawer-account-copy">
           <strong>${esc(user?.displayName || (user?.email ? user.email.split("@")[0] : "MynAssistant"))}</strong>
           <span>${esc(user?.email || "Giriş yap veya kayıt ol")}</span>
@@ -191,7 +191,7 @@ function renderHeader() {
   return `
     <header class="topbar">
       <button class="icon-button" data-action="drawer-open" aria-label="Menüyü aç">${icon("menu")}</button>
-      <div class="brand"><img src="./mynassistant-logo.png" alt=""><div class="brand-copy"><strong>MynAssistant</strong><small>PERSONAL ASSISTANT</small></div></div>
+      <div class="brand"><img src="./mynassistant-logo.webp" alt=""><div class="brand-copy"><strong>MynAssistant</strong><small>PERSONAL ASSISTANT</small></div></div>
       <div class="topbar-spacer"></div>
       <div class="header-status" title="${online} çevrimiçi bilgisayar"><span class="status-dot ${online ? "online" : ""}"></span><span>${online ? online + " cihaz çevrimiçi" : "Cihazlar bekleniyor"}</span></div>
       <button class="icon-button" data-action="toggle-theme" aria-label="Temayı değiştir">${icon(state.theme === "dark" ? "sun" : "moon")}</button>
@@ -232,7 +232,7 @@ function renderHome() {
   return `
     <section class="hero-identity" aria-label="MynAssistant">
       <div class="hero-avatar-shell">
-        <img class="hero-avatar" src="./mynassistant-logo.png" alt="MynAssistant asistan logosu">
+        <img class="hero-avatar" src="./mynassistant-logo.webp" alt="MynAssistant asistan logosu">
       </div>
       <div class="hero-identity-copy">
         <span class="hero-kicker"><span class="status-dot online"></span> KİŞİSEL ASİSTAN</span>
@@ -269,7 +269,7 @@ function renderAuth() {
   if (state.user) return renderAccount();
   if (!state.firebaseReady) return `${renderHeading("Hesap bağlantısını etkinleştir", "Google ile giriş arayüzü hazır; Firebase Web uygulaması yapılandırması henüz tamamlanmadı.")}
     <section class="card">
-      <div class="row"><img class="avatar" src="./mynassistant-logo.png" alt="MynAssistant logosu"><div><h3>Google ile MynAssistant</h3><p>Android uygulamasıyla aynı Firebase projesine bağlanır.</p></div></div>
+      <div class="row"><img class="avatar" src="./mynassistant-logo.webp" alt="MynAssistant logosu"><div><h3>Google ile MynAssistant</h3><p>Android uygulamasıyla aynı Firebase projesine bağlanır.</p></div></div>
       <button class="button secondary full" disabled style="margin-top:14px">Google ile devam et · Kurulum bekleniyor</button>
       <p>Google girişini etkinleştirmek için Firebase Console'da <strong>myncloud-24</strong> projesine bir Web uygulaması kaydet ve Web SDK yapılandırmasını aşağıdaki dosyaya aktar.</p>
       <a class="button full" href="https://console.firebase.google.com/project/myncloud-24/settings/general" target="_blank" rel="noopener">Firebase Web uygulamasını yapılandır</a>
@@ -299,7 +299,7 @@ function renderAccount() {
     ${renderHeading("Hesabım", "MynAssistant profil bilgilerin.")}
     <section class="card">
       <div class="row" style="margin-bottom:18px">
-        ${u.photoURL ? `<img class="avatar" src="${esc(u.photoURL)}" alt="Profil fotoğrafı">` : '<img class="avatar" src="./mynassistant-logo.png" alt="MynAssistant logosu">'}
+        ${u.photoURL ? `<img class="avatar" src="${esc(u.photoURL)}" alt="Profil fotoğrafı">` : '<img class="avatar" src="./mynassistant-logo.webp" alt="MynAssistant logosu">'}
         <div class="device-info"><strong>${esc(u.displayName || u.email?.split("@")[0] || "MynAssistant kullanıcısı")}</strong><span>${esc(u.email || "")}</span></div>
         <span class="pill ${u.emailVerified ? "success" : "warning"}">${u.emailVerified ? "E-posta doğrulandı" : "E-posta bekliyor"}</span>
       </div>
@@ -911,7 +911,7 @@ async function saveProfile(form) {
 }
 
 function startApp() {
-  appRoot.innerHTML = '<div class="boot-screen"><img src="./mynassistant-logo.png" alt="" width="58" height="58"><strong>MynAssistant</strong><span>Firebase bağlantısı kuruluyor…</span><div class="progress" style="width:150px"><span></span></div></div>';
+  appRoot.innerHTML = '<div class="boot-screen"><img src="./mynassistant-logo.webp" alt="" width="58" height="58"><strong>MynAssistant</strong><span>Firebase bağlantısı kuruluyor…</span><div class="progress" style="width:150px"><span></span></div></div>';
   if (!firebaseConfig.appId || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
     state.firebaseReady = false;
     render();

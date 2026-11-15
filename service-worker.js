@@ -1,11 +1,11 @@
-const CACHE_NAME = "mynassistant-web-shell-v1";
+const CACHE_NAME = "mynassistant-web-shell-v2";
 const SHELL_FILES = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./firebase-config.js",
-  "./mynassistant-mark.svg",
+  "./mynassistant-logo.webp",
   "./manifest.webmanifest"
 ];
 

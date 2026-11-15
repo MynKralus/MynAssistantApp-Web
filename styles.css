@@ -384,7 +384,7 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
 }
 .hero-kicker .status-dot { width: 6px; height: 6px; }
 .avatar-fallback { overflow: hidden; }
-.avatar[src="./mynassistant-logo.png"] { object-fit: cover; }
+.avatar[src="./mynassistant-logo.webp"] { object-fit: cover; }
 @media (max-width: 600px) {
   .hero-identity { min-height: 300px; padding-top: 20px; gap: 15px; }
   .hero-avatar-shell { width: 158px; border-radius: 38px; }

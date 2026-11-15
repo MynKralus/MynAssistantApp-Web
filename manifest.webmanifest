@@ -10,9 +10,9 @@
   "theme_color": "#0b0d14",
   "icons": [
     {
-      "src": "./mynassistant-logo.png",
+      "src": "./mynassistant-logo.webp",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/webp",
       "purpose": "any"
     }
   ]
