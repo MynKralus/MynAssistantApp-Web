@@ -45,7 +45,7 @@ jobs:
               raise SystemExit("The owner-provided MynAssistant logo is missing.")
 
           with Image.open(source) as opened:
-              if opened.format != "WEBP" or opened.size != (512, 512):
+              if opened.format != "WEBP" or opened.size != (256, 256):
                   raise SystemExit("The canonical MynAssistant logo has an unexpected format or dimensions.")
               image = opened.convert("RGBA")
               for size, filename in (
