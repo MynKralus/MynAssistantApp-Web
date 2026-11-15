@@ -315,3 +315,78 @@ body.light-theme {
 body.light-theme .topbar { background: rgba(245,246,250,.9); }
 body.light-theme .touchpad { background: #414141; }
 body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff); }
+
+/* MynAssistant brand avatar */
+.hero-identity {
+  min-height: 318px;
+  padding: 22px 18px 26px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 17px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.hero-identity::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 310px;
+  height: 250px;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse, rgba(113,136,255,.22), rgba(113,136,255,.05) 48%, transparent 72%);
+  filter: blur(10px);
+}
+.hero-avatar-shell {
+  width: clamp(150px, 42vw, 192px);
+  aspect-ratio: 1;
+  border-radius: 44px;
+  padding: 9px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, rgba(173,190,255,.22), rgba(104,125,255,.08) 55%, rgba(157,217,210,.16));
+  border: 1px solid rgba(164,181,255,.24);
+  box-shadow: 0 0 0 9px rgba(115,137,255,.045), 0 24px 70px rgba(0,0,0,.3), 0 0 58px rgba(112,133,255,.16);
+}
+.hero-avatar {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 36px;
+  object-fit: contain;
+}
+.hero-identity-copy { max-width: 540px; }
+.hero-identity-copy h1 {
+  margin: 8px 0 0;
+  font-size: clamp(30px, 7vw, 38px);
+  letter-spacing: -1.2px;
+  line-height: 1.08;
+}
+.hero-identity-copy p {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 9px 0 0;
+}
+.hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--mint);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.25px;
+}
+.hero-kicker .status-dot { width: 6px; height: 6px; }
+.avatar-fallback { overflow: hidden; }
+.avatar[src="./mynassistant-mark.svg"] { object-fit: cover; }
+@media (max-width: 600px) {
+  .hero-identity { min-height: 300px; padding-top: 20px; gap: 15px; }
+  .hero-avatar-shell { width: 158px; border-radius: 38px; }
+  .hero-avatar { border-radius: 30px; }
+}
