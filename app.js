@@ -313,6 +313,14 @@ function renderDevices() {
   `;
 }
 
+function renderRemoteScreenContent(device) {
+  if (!device?.screenJpegBase64) {
+    return '<div class="empty-state"><div class="empty-icon">' + icon("monitor") +
+      '</div><strong>Ekran görüntüsü bekleniyor</strong><p>Önizleme Windows Agent çalışırken ve bu sayfa açıkken alınır.</p></div>';
+  }
+  return '<img class="screen-preview" alt="Windows masaüstü önizlemesi" src="data:image/jpeg;base64,' +
+    esc(device.screenJpegBase64) + '">';
+}
 function renderRemote() {
   if (!state.user) return `${renderHeading("PC Kumandası","Bilgisayarını kontrol etmek için giriş yap.")}<section class="card"><button class="button full" data-page="auth">Giriş yap / Kayıt ol</button></section>`;
   const device = currentDevice();
@@ -332,7 +340,7 @@ function renderRemote() {
         </select>
       </div>
     </section>
-    ${state.remoteScreenEnabled ? `<section class="section-stack"><div class="section-heading"><h3>Windows masaüstü</h3><span class="muted tiny">Sayfa açıkken güncellenir</span></div>${hasFrame ? `<img class="screen-preview" alt="Windows masaüstü önizlemesi" src="data:image/jpeg;base64,${esc(device.screenJpegBase64)}">` : '<div class="empty-state"><div class="empty-icon">' + icon("monitor") + '</div><strong>Ekran görüntüsü bekleniyor</strong><p>Önizleme Windows Agent çalışırken ve bu sayfa açıkken alınır.</p></div>'}</section>` : ""}
+    ${state.remoteScreenEnabled ? `<section class="section-stack"><div class="section-heading"><h3>Windows masaüstü</h3><span class="muted tiny">Sayfa açıkken güncellenir</span></div><div id="remote-screen-content">${renderRemoteScreenContent(device)}</div></section>` : ""}
     <section class="card">
       <div class="eyebrow">PC KUMANDASI</div>
       <div class="remote-grid">
@@ -522,7 +530,18 @@ function subscribeDevices() {
   render();
   const q = query(collection(db, "devices"), where("ownerId", "==", state.user.uid));
   state.deviceUnsubscribe = onSnapshot(q, snapshot => {
-    state.devices = snapshot.docs.map(s => ({id:s.id,...s.data()}));
+    const previousControlState = state.devices.map(d => [
+      d.id,d.name || d.deviceName || "",d.platform || d.type || d.os || "",
+      d.status || "",d.connectionMode || "",timeMillis(d.lastSeenAt)
+    ].join("|")).sort().join("|");
+    const nextDevices = snapshot.docs.map(s => ({id:s.id,...s.data()}));
+    const nextControlState = nextDevices.map(d => [
+      d.id,d.name || d.deviceName || "",d.platform || d.type || d.os || "",
+      d.status || "",d.connectionMode || "",timeMillis(d.lastSeenAt)
+    ].join("|")).sort().join("|");
+    const onlyRemoteFramesChanged = state.page === "remote" &&
+      previousControlState === nextControlState && state.devices.length === nextDevices.length;
+    state.devices = nextDevices;
     state.devicesLoading = false;
     state.devicesError = "";
     const chosen = pcDevices().find(d=>d.id===state.selectedDeviceId);
@@ -530,7 +549,10 @@ function subscribeDevices() {
       state.selectedDeviceId = currentDevice()?.id || "";
       if (state.selectedDeviceId) storageSet("myn-selected-device", state.selectedDeviceId);
     }
-    render();
+    if (onlyRemoteFramesChanged) {
+      const preview = document.getElementById("remote-screen-content");
+      if (preview && state.remoteScreenEnabled) preview.innerHTML = renderRemoteScreenContent(currentDevice());
+    } else render();
   }, error => {
     state.devicesLoading = false;
     state.devicesError = "Cihaz listesi yüklenemedi. Firestore kurallarını ve internet bağlantını kontrol et.";
@@ -885,7 +907,13 @@ function startApp() {
     logIssue("MYN-WEB-AUTH-001","Oturum", "Firebase oturum durumu okunamadı.",error?.code || "");
     appRoot.innerHTML = '<section class="card"><h2>Hesap bağlantısı kurulamadı</h2><p>İnternet bağlantını ve Firebase yapılandırmasını kontrol et.</p></section>';
   });
-  // Firestore onSnapshot updates device/status UI. Avoid periodic rerenders while typing.
+  // Refresh heartbeat-based state without replacing focused inputs or an active touchpad gesture.
+  setInterval(() => {
+    const activeTag = document.activeElement?.tagName;
+    if (!state.busy && !touchStart && !["INPUT","TEXTAREA","SELECT"].includes(activeTag)) {
+      if (["home","remote","devices","files"].includes(state.page)) render();
+    }
+  }, 15_000);
 }
 
 let auth;
