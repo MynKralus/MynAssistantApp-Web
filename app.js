@@ -322,8 +322,8 @@ function renderRemote() {
       <div class="eyebrow">PC KUMANDASI</div>
       <div class="remote-grid">
         <button class="remote-control" data-command="mute" ${online?"":"disabled"}>${icon("mute")}Sesi kapat / aç</button>
-        <button class="remote-control" data-command="volume_up" ${online?"":"disabled}>${icon("volume")}Sesi artır</button>
-        <button class="remote-control" data-command="volume_down" ${online?"":"disabled}>${icon("volume")}Sesi kıs</button>
+        <button class="remote-control" data-command="volume_up" ${online?"":"disabled"}>${icon("volume")}Sesi artır</button>
+        <button class="remote-control" data-command="volume_down" ${online?"":"disabled"}>${icon("volume")}Sesi kıs</button>
         <button class="remote-control" data-command="home" ${online?"":"disabled"}>${icon("home")}Masaüstünü göster</button>
       </div>
       <p class="muted tiny" style="margin-top:12px">Bilgisayarın kilitlenmesi ve uygulama kapatma komutları mevcut Windows Agent sürümünde etkin değil, bu nedenle gönderilmiyor.</p>
