@@ -1,4 +1,4 @@
-const CACHE_NAME = "mynassistant-web-shell-v4";
+const CACHE_NAME = "mynassistant-web-shell-v5";
 const SHELL_FILES = [
   "./",
   "./index.html",
