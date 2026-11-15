@@ -279,14 +279,18 @@ function renderAuth() {
   return `
     ${renderHeading(register ? "MynAssistant hesabı oluştur" : "Tekrar hoş geldin", register ? "Hesabını oluştur ve cihazlarını bağla." : "Hesabına giriş yaparak devam et.")}
     <section class="card">
+      <div class="notice" style="margin-bottom:14px">
+        <strong>Android MynAssistant hesabın Google ile açıldıysa</strong><br>
+        Aynı Google hesabıyla devam etmek için aşağıdaki düğmeyi kullan. E-posta/şifre girişi ayrı bir Firebase giriş yöntemidir.
+      </div>
+      <button class="button full" data-action="google-login">${icon("user")} Google ile devam et</button>
+      <div class="row" style="margin:17px 0"><span style="height:1px;background:var(--border);flex:1"></span><span class="muted tiny">E-POSTA / ŞİFRE ALTERNATİFİ</span><span style="height:1px;background:var(--border);flex:1"></span></div>
       <form id="auth-form" class="form-stack">
         ${register ? '<div class="field"><label for="auth-name">Ad soyad</label><input class="input" id="auth-name" name="name" autocomplete="name" maxlength="80" required></div>' : ""}
         <div class="field"><label for="auth-email">E-posta</label><input class="input" id="auth-email" name="email" type="email" autocomplete="email" maxlength="254" required></div>
         <div class="field"><label for="auth-password">Şifre</label><input class="input" id="auth-password" name="password" type="password" autocomplete="${register ? "new-password" : "current-password"}" minlength="8" maxlength="128" required></div>
-        <button class="button full" type="submit">${register ? "Hesap oluştur" : "Giriş yap"}</button>
+        <button class="button secondary full" type="submit">${register ? "E-posta ile hesap oluştur" : "E-posta ve şifreyle giriş yap"}</button>
       </form>
-      <div class="row" style="margin:15px 0"><span style="height:1px;background:var(--border);flex:1"></span><span class="muted tiny">veya</span><span style="height:1px;background:var(--border);flex:1"></span></div>
-      <button class="button secondary full" data-action="google-login">Google ile devam et</button>
       ${!register ? '<button class="link-button" type="button" data-action="reset-password" style="margin-top:8px">Şifremi unuttum</button>' : ""}
       <p class="muted small" style="margin-top:15px">${register ? "Zaten hesabın var mı?" : "Henüz hesabın yok mu?"} <button class="link-button" data-action="toggle-auth">${register ? "Giriş yap" : "Kayıt ol"}</button></p>
       ${state.feedback ? `<div class="notice" role="status">${esc(state.feedback)}</div>` : ""}
