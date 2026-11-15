@@ -72,7 +72,7 @@ function loadLogs() {
   } catch { return []; }
 }
 const state = {
-  user: null, page: "home", settingsTab: "Genel", authMode: "login",
+  firebaseReady: false, user: null, page: "home", settingsTab: "Genel", authMode: "login",
   theme: storageGet("myn-theme", "dark"), drawerOpen: false,
   devices: [], devicesLoading: false, devicesError: "",
   profile: null, profileBusy: false, profileMessage: "",
@@ -236,6 +236,7 @@ function renderHome() {
       <h2>Sana nasıl yardımcı olabilirim?</h2>
       <p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p>
     </section>
+    ${!state.firebaseReady ? '<div class="notice warning">Firebase Web uygulaması yapılandırılmadı. Sayfaları önizleyebilirsin; giriş, canlı cihazlar ve komut gönderimi Web SDK yapılandırmasını tamamlayınca etkinleşir.</div>' : ""}
     <section class="section-stack">
       <div class="section-heading"><h2>Hızlı erişim</h2><span class="muted tiny">MynAssistant</span></div>
       <div class="grid-2">
@@ -257,6 +258,8 @@ function renderHome() {
 
 function renderAuth() {
   if (state.user) return renderAccount();
+  if (!state.firebaseReady) return `${renderHeading("Firebase Web uygulaması gerekli", "Web arayüzü önizlemesi açık; hesap ve cihaz bağlantısı için bir kez Firebase Web uygulaması kaydetmelisin.")}
+    <section class="card"><h3>Firebase kurulumu tamamlanmadı</h3><p>Firebase Console içinde myncloud-24 projesine Web uygulaması ekle ve Web SDK yapılandırmasını firebase-config.js dosyasına kopyala. Android uygulama kimliğini Web appId olarak kullanma.</p><a class="button secondary full" href="https://console.firebase.google.com/project/myncloud-24/settings/general" target="_blank" rel="noopener">Firebase proje ayarlarını aç</a></section>`;
   const register = state.authMode === "register";
   return `
     ${renderHeading(register ? "MynAssistant hesabı oluştur" : "Tekrar hoş geldin", register ? "Hesabını oluştur ve cihazlarını bağla." : "Hesabına giriş yaparak devam et.")}
@@ -884,14 +887,15 @@ async function saveProfile(form) {
 function startApp() {
   appRoot.innerHTML = '<div class="boot-screen"><img src="./mynassistant-mark.svg" alt="" width="58" height="58"><strong>MynAssistant</strong><span>Firebase bağlantısı kuruluyor…</span><div class="progress" style="width:150px"><span></span></div></div>';
   if (!firebaseConfig.appId || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
-    appRoot.className = "app-main";
-    appRoot.innerHTML = '<section class="card"><h2>Firebase Web uygulaması kurulumu gerekli</h2><p>Firebase Console içinde myncloud-24 projesine bir Web uygulaması ekle ve Web SDK yapılandırmasını firebase-config.js dosyasına kopyala. Android uygulama kimliğini Web appId yerine kullanma.</p><a class="button secondary" href="https://console.firebase.google.com/project/myncloud-24/settings/general" target="_blank" rel="noopener">Firebase proje ayarlarını aç</a></section>';
+    state.firebaseReady = false;
+    render();
     return;
   }
   try {
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
+    state.firebaseReady = true;
   } catch(error) {
     appRoot.className = "app-main";
     appRoot.innerHTML = '<section class="card"><h2>Firebase yapılandırması yüklenemedi</h2><p>firebase-config.js dosyasındaki Web uygulaması bilgilerini kontrol et.</p><p class="muted small">' + esc(error?.message || "") + '</p></section>';
