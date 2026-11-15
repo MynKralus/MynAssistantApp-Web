@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword, setPersistence, browserLocalPersistence,
   createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect,
   getRedirectResult, GoogleAuthProvider, signOut, updateProfile,
   sendEmailVerification, sendPasswordResetEmail, verifyBeforeUpdateEmail
@@ -72,7 +72,7 @@ function loadLogs() {
   } catch { return []; }
 }
 const state = {
-  firebaseReady: false, user: null, page: "home", settingsTab: "Genel", authMode: "login",
+  firebaseReady: false, authReady: false, authBusy: false, user: null, page: "home", settingsTab: "Genel", authMode: "login",
   theme: storageGet("myn-theme", "dark"), drawerOpen: false,
   devices: [], devicesLoading: false, devicesError: "",
   profile: null, profileBusy: false, profileMessage: "",
@@ -283,7 +283,7 @@ function renderAuth() {
         <strong>Android MynAssistant hesabın Google ile açıldıysa</strong><br>
         Aynı Google hesabıyla devam etmek için aşağıdaki düğmeyi kullan. E-posta/şifre girişi ayrı bir Firebase giriş yöntemidir.
       </div>
-      <button class="button full" data-action="google-login">${icon("user")} Google ile devam et</button>
+      <button class="button full" data-action="google-login" ${state.authBusy ? "disabled" : ""}>${icon("user")} ${state.authBusy ? "Google hesabı doğrulanıyor…" : "Google ile devam et"}</button>
       <div class="row" style="margin:17px 0"><span style="height:1px;background:var(--border);flex:1"></span><span class="muted tiny">E-POSTA / ŞİFRE ALTERNATİFİ</span><span style="height:1px;background:var(--border);flex:1"></span></div>
       <form id="auth-form" class="form-stack">
         ${register ? '<div class="field"><label for="auth-name">Ad soyad</label><input class="input" id="auth-name" name="name" autocomplete="name" maxlength="80" required></div>' : ""}
@@ -877,12 +877,12 @@ function friendlyAuthError(error, provider = "password") {
     "auth/too-many-requests": "Çok fazla giriş denemesi yapıldı. Bir süre bekleyip tekrar dene.",
     "auth/user-disabled": "Bu hesap devre dışı bırakılmış. Hesap yöneticisiyle iletişime geç.",
     "auth/operation-not-allowed": provider === "google" ? "Firebase Authentication içinde Google sağlayıcısı etkin değil." : "Firebase Authentication içinde E-posta/Şifre sağlayıcısı etkin değil.",
-    "auth/unauthorized-domain": "Bu web alan adı Firebase Authentication → Authorized domains listesinde yetkili değil.",
+    "auth/unauthorized-domain": "mynkralus.github.io alan adı Firebase Authentication → Settings → Authorized domains listesinde yetkili değil.",
     "auth/network-request-failed": "İnternet bağlantısı kurulamadı. Bağlantını kontrol edip tekrar dene.",
     "auth/email-already-in-use": "Bu e-posta zaten kayıtlı. Giriş yap veya Google ile devam et.",
     "auth/weak-password": "Şifre yeterince güçlü değil. En az 8 karakter kullan.",
     "auth/invalid-email": "E-posta adresinin biçimini kontrol et.",
-    "auth/popup-blocked": "Tarayıcı giriş penceresini engelledi. Tekrar dene; mobil cihazlarda Google girişi yönlendirme ile açılır.",
+    "auth/popup-blocked": "Chrome Google giriş penceresini engelledi. MynAssistant sayfasını normal Chrome sekmesinde aç ve açılır pencerelere izin ver.",
     "auth/popup-closed-by-user": "Google giriş penceresi kapatıldı; giriş tamamlanmadı.",
     "auth/cancelled-popup-request": "Önceki Google giriş isteği iptal edildi. Yeniden dene.",
     "auth/account-exists-with-different-credential": "Bu e-posta başka bir giriş yöntemiyle kayıtlı. Önce kayıtlı sağlayıcıyla giriş yap.",
@@ -929,20 +929,66 @@ async function handleAuthForm(form) {
     await signInWithEmailAndPassword(auth,email,password);
   }
 }
-async function googleLogin() {
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({prompt:"select_account"});
-  // Mobile Chrome and in-app browsers handle Firebase Google auth more reliably via redirect.
-  const mobileBrowser = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  if (mobileBrowser) {
-    await signInWithRedirect(auth,provider);
-    return;
+function applyAuthenticatedUser(user, source = "observer") {
+  const previousUid = state.user?.uid || "";
+  const nextUid = user?.uid || "";
+  const changed = previousUid !== nextUid;
+  state.user = user || null;
+  state.authReady = true;
+
+  if (user) {
+    // A successful sign-in always returns the user to the main assistant screen.
+    if (state.page === "auth" || source === "google-popup" || source === "redirect-result") {
+      state.page = "home";
+      state.drawerOpen = false;
+    }
+    if (changed) state.feedback = "";
+  } else {
+    state.devices = [];
+    state.profile = null;
+    state.deviceUnsubscribe?.();
+    state.profileUnsubscribe?.();
+    state.deviceUnsubscribe = null;
+    state.profileUnsubscribe = null;
   }
-  try { await signInWithPopup(auth,provider); }
-  catch(error) {
-    if (["auth/popup-blocked","auth/popup-closed-by-user","auth/cancelled-popup-request"].includes(error?.code)) {
-      await signInWithRedirect(auth,provider);
-    } else throw error;
+
+  if (changed || (user && !state.deviceUnsubscribe)) {
+    subscribeDevices();
+    subscribeProfile();
+  }
+  render();
+
+  if (user && changed) {
+    const label = user.displayName || user.email || "MynAssistant kullanıcısı";
+    showToast("Hoş geldin, " + label + ". Hesabın bağlandı; cihazların yükleniyor.");
+  }
+}
+
+async function googleLogin() {
+  if (!auth || !state.firebaseReady) throw new Error("Firebase oturumu henüz hazır değil. Sayfayı yenileyip tekrar dene.");
+  if (state.authBusy) return;
+
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({prompt:"select_account", hl:"tr"});
+  auth.languageCode = "tr";
+
+  // GitHub Pages is hosted on github.io while Firebase Auth helpers run on firebaseapp.com.
+  // On current Chrome builds, redirect auth can lose its cross-site helper storage.
+  // Open the Google popup directly in the click gesture instead of falling back to redirect.
+  const signInTask = signInWithPopup(auth,provider);
+  state.authBusy = true;
+  state.feedback = "Google hesabı doğrulanıyor…";
+  render();
+
+  try {
+    const credential = await signInTask;
+    await credential.user.getIdToken();
+    applyAuthenticatedUser(credential.user,"google-popup");
+    state.feedback = "";
+    render();
+  } finally {
+    state.authBusy = false;
+    render();
   }
 }
 async function saveProfile(form) {
@@ -966,7 +1012,7 @@ async function saveProfile(form) {
   } finally { state.profileBusy=false; render(); }
 }
 
-function startApp() {
+async function startApp() {
   appRoot.innerHTML = '<div class="boot-screen"><img src="./mynassistant-logo.webp" alt="" width="58" height="58"><strong>MynAssistant</strong><span>Firebase bağlantısı kuruluyor…</span><div class="progress" style="width:150px"><span></span></div></div>';
   if (!firebaseConfig.appId || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
     state.firebaseReady = false;
@@ -978,24 +1024,38 @@ function startApp() {
     auth = getAuth(app);
     db = getFirestore(app);
     state.firebaseReady = true;
+    auth.languageCode = "tr";
   } catch(error) {
     appRoot.className = "app-main";
     appRoot.innerHTML = '<section class="card"><h2>Firebase yapılandırması yüklenemedi</h2><p>firebase-config.js dosyasındaki Web uygulaması bilgilerini kontrol et.</p><p class="muted small">' + esc(error?.message || "") + '</p></section>';
     return;
   }
-  getRedirectResult(auth).catch(error=>logIssue("MYN-WEB-AUTH-003","Google girişi","Google giriş yönlendirmesi tamamlanamadı.",error?.code || ""));
-  onAuthStateChanged(auth, user => {
-    state.user=user;
-    if (!user) {
-      state.devices=[]; state.profile=null;
-      state.deviceUnsubscribe?.(); state.profileUnsubscribe?.();
-      state.deviceUnsubscribe=null; state.profileUnsubscribe=null;
+
+  try {
+    // Keep the authenticated user after returning from Google and across browser restarts.
+    await setPersistence(auth,browserLocalPersistence);
+  } catch(error) {
+    logIssue("MYN-WEB-AUTH-005","Oturum saklama","Tarayıcı oturum saklama ayarı uygulanamadı. Gizli sekme veya tarayıcı depolama ayarlarını kontrol et.",error?.code || "");
+  }
+
+  try {
+    // Complete any redirect started by an earlier deployed version before attaching the observer.
+    const legacyRedirectResult = await getRedirectResult(auth);
+    if (legacyRedirectResult?.user) {
+      await legacyRedirectResult.user.getIdToken();
+      applyAuthenticatedUser(legacyRedirectResult.user,"redirect-result");
     }
-    subscribeDevices();
-    subscribeProfile();
-    render();
+  } catch(error) {
+    state.page = "auth";
+    state.feedback = friendlyAuthError(error,"google");
+    logIssue("MYN-WEB-AUTH-003","Google girişi",state.feedback,error?.code || "");
+  }
+
+  onAuthStateChanged(auth, user => {
+    applyAuthenticatedUser(user,"observer");
   },error=>{
-    logIssue("MYN-WEB-AUTH-001","Oturum", "Firebase oturum durumu okunamadı.",error?.code || "");
+    state.authReady = true;
+    logIssue("MYN-WEB-AUTH-001","Oturum","Firebase oturum durumu okunamadı.",error?.code || "");
     appRoot.innerHTML = '<section class="card"><h2>Hesap bağlantısı kurulamadı</h2><p>İnternet bağlantını ve Firebase yapılandırmasını kontrol et.</p></section>';
   });
   // Refresh heartbeat-based state without replacing focused inputs or an active touchpad gesture.
@@ -1169,7 +1229,10 @@ window.addEventListener("unhandledrejection",event=>{
 });
 window.addEventListener("beforeunload",()=>stopScreenPreview());
 
-startApp();
+startApp().catch(error => {
+  logIssue("MYN-WEB-BOOT-001","Uygulama başlatma","MynAssistant başlatılamadı. Sayfayı yenileyip tekrar dene.",error?.message || "");
+  appRoot.innerHTML = '<section class="card"><h2>MynAssistant başlatılamadı</h2><p>Sayfayı yenileyip tekrar dene. Sorun sürerse Hata kayıtları bölümünü kontrol et.</p></section>';
+});
 if ("serviceWorker" in navigator && location.protocol === "https:") {
   navigator.serviceWorker.register("./service-worker.js").catch(error => {
     logIssue("MYN-WEB-PWA-001", "Çevrimdışı uygulama", "Uygulama kabuğu kaydedilemedi.", error?.message || "");
