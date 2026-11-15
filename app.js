@@ -3,7 +3,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
   createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect,
   getRedirectResult, GoogleAuthProvider, signOut, updateProfile,
-  sendEmailVerification, verifyBeforeUpdateEmail
+  sendEmailVerification, sendPasswordResetEmail, verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   getFirestore, collection, query, where, onSnapshot, doc, updateDoc,
@@ -287,6 +287,7 @@ function renderAuth() {
       </form>
       <div class="row" style="margin:15px 0"><span style="height:1px;background:var(--border);flex:1"></span><span class="muted tiny">veya</span><span style="height:1px;background:var(--border);flex:1"></span></div>
       <button class="button secondary full" data-action="google-login">Google ile devam et</button>
+      ${!register ? '<button class="link-button" type="button" data-action="reset-password" style="margin-top:8px">Şifremi unuttum</button>' : ""}
       <p class="muted small" style="margin-top:15px">${register ? "Zaten hesabın var mı?" : "Henüz hesabın yok mu?"} <button class="link-button" data-action="toggle-auth">${register ? "Giriş yap" : "Kayıt ol"}</button></p>
       ${state.feedback ? `<div class="notice" role="status">${esc(state.feedback)}</div>` : ""}
     </section>
@@ -813,14 +814,16 @@ async function requestPermission(kind) {
     if (kind === "microphone" || kind === "camera") {
       const stream = await navigator.mediaDevices.getUserMedia(kind === "microphone" ? {audio:true} : {video:true});
       stream.getTracks().forEach(t=>t.stop());
-      showToast(kind === "microphone" ? "Mikrofon izni verildi." : "Kamera izni verildi.");
+      const pill = document.getElementById(kind === "microphone" ? "permission-microphone" : "permission-camera");
+      if (pill) { pill.textContent = "İzin verildi"; pill.className = "pill success"; }
+      showToast(kind === "microphone" ? "Mikrofon izni verildi. Sesli komutu yeniden deneyebilirsin." : "Kamera izni verildi.");
     } else if (kind === "notifications") {
       if (!("Notification" in window)) throw new Error("Bu tarayıcı bildirimleri desteklemiyor.");
       const result = await Notification.requestPermission();
       showToast("Bildirim izni: " + result);
     }
   } catch(error) {
-    const message = error?.name === "NotAllowedError" ? "İzin reddedildi veya tarayıcı tarafından engellendi." : error?.message || "İzin alınamadı.";
+    const message = error?.name === "NotAllowedError" ? (kind === "microphone" ? "Mikrofon izni reddedildi. Android Ayarlar → Uygulamalar → Chrome → İzinler → Mikrofon bölümünden izin ver; site ayarlarında da Mikrofonu etkinleştir." : "İzin reddedildi veya tarayıcı tarafından engellendi.") : error?.message || "İzin alınamadı.";
     logIssue("MYN-WEB-PERM-001","Tarayıcı izni",message,error?.name || "");
   }
 }
@@ -840,7 +843,17 @@ function startSpeech() {
     else { navigate("home"); }
     showToast("Ses tanındı. Göndermeden önce komutu kontrol et.");
   };
-  recognition.onerror = event => logIssue("MYN-WEB-SPEECH-001","Ses tanıma","Ses tanıma tamamlanamadı: "+(event.error || "bilinmeyen hata"));
+  recognition.onerror = event => {
+    const errorCode = String(event.error || "");
+    const message = errorCode === "not-allowed" || errorCode === "service-not-allowed"
+      ? "Mikrofon izni tarayıcı tarafından engellendi. Android Ayarlar → Uygulamalar → Chrome → İzinler → Mikrofon bölümünden izin ver; ayrıca site ayarlarında bu adres için Mikrofon iznini aç."
+      : errorCode === "no-speech"
+        ? "Ses algılanmadı. Mikrofonu kontrol edip daha yakından konuşarak tekrar dene."
+        : errorCode === "audio-capture"
+          ? "Mikrofon bulunamadı veya başka bir uygulama tarafından kullanılıyor."
+          : "Ses tanıma tamamlanamadı: " + (errorCode || "bilinmeyen hata");
+    logIssue("MYN-WEB-SPEECH-001","Ses tanıma",message,errorCode);
+  };
   recognition.onend = () => { state.speechBusy=false; state.speechRecognition=null; };
   try { recognition.start(); } catch(error) { logIssue("MYN-WEB-SPEECH-002","Ses tanıma",error.message || "Mikrofon başlatılamadı."); }
 }
@@ -851,6 +864,45 @@ function downloadTextFile(name, content, type = "application/json") {
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
+function friendlyAuthError(error, provider = "password") {
+  const code = String(error?.code || "");
+  const messages = {
+    "auth/invalid-credential": "E-posta/şifre bilgileri eşleşmedi. Android hesabını Google ile açtıysan “Google ile devam et” düğmesini kullan. E-posta/şifre hesabın yoksa “Kayıt ol” seçeneğini kullan.",
+    "auth/wrong-password": "Şifre doğru görünmüyor. Tekrar dene veya “Şifremi unuttum” ile sıfırlama bağlantısı iste.",
+    "auth/user-not-found": "Bu e-posta ile e-posta/şifre hesabı bulunamadı. Google ile kayıt olduysan Google ile devam et.",
+    "auth/too-many-requests": "Çok fazla giriş denemesi yapıldı. Bir süre bekleyip tekrar dene.",
+    "auth/user-disabled": "Bu hesap devre dışı bırakılmış. Hesap yöneticisiyle iletişime geç.",
+    "auth/operation-not-allowed": provider === "google" ? "Firebase Authentication içinde Google sağlayıcısı etkin değil." : "Firebase Authentication içinde E-posta/Şifre sağlayıcısı etkin değil.",
+    "auth/unauthorized-domain": "Bu web alan adı Firebase Authentication → Authorized domains listesinde yetkili değil.",
+    "auth/network-request-failed": "İnternet bağlantısı kurulamadı. Bağlantını kontrol edip tekrar dene.",
+    "auth/email-already-in-use": "Bu e-posta zaten kayıtlı. Giriş yap veya Google ile devam et.",
+    "auth/weak-password": "Şifre yeterince güçlü değil. En az 8 karakter kullan.",
+    "auth/invalid-email": "E-posta adresinin biçimini kontrol et.",
+    "auth/popup-blocked": "Tarayıcı giriş penceresini engelledi. Tekrar dene; mobil cihazlarda Google girişi yönlendirme ile açılır.",
+    "auth/popup-closed-by-user": "Google giriş penceresi kapatıldı; giriş tamamlanmadı.",
+    "auth/cancelled-popup-request": "Önceki Google giriş isteği iptal edildi. Yeniden dene.",
+    "auth/account-exists-with-different-credential": "Bu e-posta başka bir giriş yöntemiyle kayıtlı. Önce kayıtlı sağlayıcıyla giriş yap.",
+    "auth/invalid-action-code": "Sıfırlama bağlantısı geçersiz veya süresi dolmuş. Yeni bağlantı iste."
+  };
+  return messages[code] || error?.message || "İşlem tamamlanamadı. Tekrar dene.";
+}
+async function resetPassword() {
+  const email = String(document.getElementById("auth-email")?.value || "").trim();
+  if (!email || !email.includes("@")) {
+    showToast("Önce e-posta alanına adresini yaz.");
+    document.getElementById("auth-email")?.focus();
+    return;
+  }
+  try {
+    await sendPasswordResetEmail(auth,email);
+    state.feedback = "Şifre sıfırlama bağlantısı e-posta adresine gönderildi. Gelen kutunu ve spam klasörünü kontrol et.";
+    render();
+  } catch(error) {
+    state.feedback = friendlyAuthError(error);
+    logIssue("MYN-WEB-AUTH-004","Şifre sıfırlama",state.feedback,error?.code || "");
+    render();
+  }
+}
 async function handleAuthForm(form) {
   const data = new FormData(form);
   const email = String(data.get("email") || "").trim();
@@ -971,7 +1023,8 @@ document.addEventListener("click", async event => {
     else if (action === "drawer-close") { state.drawerOpen=false; render(); }
     else if (action === "toggle-theme") { setTheme(state.theme==="dark"?"light":"dark"); render(); }
     else if (action === "toggle-auth") { state.authMode=state.authMode==="register"?"login":"register"; state.feedback=""; render(); }
-    else if (action === "google-login") { await googleLogin(); }
+    else if (action === "google-login") { try { await googleLogin(); } catch(error) { state.feedback=friendlyAuthError(error,"google"); logIssue("MYN-WEB-AUTH-003","Google girişi",state.feedback,error?.code || ""); render(); } }
+    else if (action === "reset-password") { await resetPassword(); }
     else if (action === "logout") {
       if (!confirm("MynAssistant hesabından çıkış yapılsın mı?")) return;
       await signOut(auth); navigate("home"); showToast("Çıkış yapıldı.");
@@ -1036,7 +1089,7 @@ document.addEventListener("submit", async event => {
     const button=event.target.querySelector('button[type="submit"]');
     if (button) button.disabled=true;
     try { await handleAuthForm(event.target); }
-    catch(error) { state.feedback=error?.message || "Giriş yapılamadı."; logIssue("MYN-WEB-AUTH-002","Hesap",state.feedback,error?.code || ""); render(); }
+    catch(error) { state.feedback=friendlyAuthError(error,"password"); logIssue("MYN-WEB-AUTH-002","Hesap",state.feedback,error?.code || ""); render(); }
     finally { if (button) button.disabled=false; }
   } else if (event.target.id==="profile-form") {
     event.preventDefault();
