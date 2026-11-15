@@ -9,7 +9,7 @@ import {
   getFirestore, collection, query, where, onSnapshot, doc, updateDoc,
   addDoc, serverTimestamp, Timestamp, setDoc
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
-import { firebaseConfig, SERVER_BASE_URL } from "./firebase-config.js";
+import { firebaseConfig } from "./firebase-config.js";
 
 const APP_VERSION = "0.1.0-web";
 const MAX_TRANSFER_BYTES = 500_000;
@@ -171,7 +171,7 @@ function renderDrawer() {
     <div class="drawer-backdrop ${state.drawerOpen ? "" : "hidden"}" data-action="drawer-close"></div>
     <aside class="drawer ${state.drawerOpen ? "open" : ""}" aria-label="Uygulama menüsü">
       <div class="drawer-account">
-        ${user?.photoURL ? `<img class="avatar" src="${esc(user.photoURL)}" alt="Profil fotoğrafı" referrerpolicy="no-referrer">` : `<div class="avatar avatar-fallback">${esc((user?.displayName || user?.email || "M").slice(0,1).toUpperCase())}</div>`}
+        ${user?.photoURL ? `<img class="avatar" src="${esc(user.photoURL)}" alt="Profil fotoğrafı" referrerpolicy="no-referrer">` : `<img class="avatar" src="./mynassistant-mark.svg" alt="MynAssistant logosu">`}
         <div class="drawer-account-copy">
           <strong>${esc(user?.displayName || (user?.email ? user.email.split("@")[0] : "MynAssistant"))}</strong>
           <span>${esc(user?.email || "Giriş yap veya kayıt ol")}</span>
@@ -230,7 +230,16 @@ function renderHome() {
   const target = currentDevice();
   const canSend = !!state.user && !!target && isOnline(target);
   return `
-    <section class="hero-brand"><img src="./mynassistant-mark.svg" alt=""><div><h1>MynAssistant</h1><p>Kişisel asistanın için yeni başlangıç.</p></div></section>
+    <section class="hero-identity" aria-label="MynAssistant">
+      <div class="hero-avatar-shell">
+        <img class="hero-avatar" src="./mynassistant-mark.svg" alt="MynAssistant asistan logosu">
+      </div>
+      <div class="hero-identity-copy">
+        <span class="hero-kicker"><span class="status-dot online"></span> KİŞİSEL ASİSTAN</span>
+        <h1>MynAssistant</h1>
+        <p>Kişisel asistanın. Komutların, cihazların ve araçların tek merkezde.</p>
+      </div>
+    </section>
     <section class="card hero-card">
       <div class="eyebrow">KOMUT MERKEZİ</div>
       <h2>Sana nasıl yardımcı olabilirim?</h2>
@@ -258,8 +267,14 @@ function renderHome() {
 
 function renderAuth() {
   if (state.user) return renderAccount();
-  if (!state.firebaseReady) return `${renderHeading("Firebase Web uygulaması gerekli", "Web arayüzü önizlemesi açık; hesap ve cihaz bağlantısı için bir kez Firebase Web uygulaması kaydetmelisin.")}
-    <section class="card"><h3>Firebase kurulumu tamamlanmadı</h3><p>Firebase Console içinde myncloud-24 projesine Web uygulaması ekle ve Web SDK yapılandırmasını firebase-config.js dosyasına kopyala. Android uygulama kimliğini Web appId olarak kullanma.</p><a class="button secondary full" href="https://console.firebase.google.com/project/myncloud-24/settings/general" target="_blank" rel="noopener">Firebase proje ayarlarını aç</a></section>`;
+  if (!state.firebaseReady) return `${renderHeading("Hesap bağlantısını etkinleştir", "Google ile giriş arayüzü hazır; Firebase Web uygulaması yapılandırması henüz tamamlanmadı.")}
+    <section class="card">
+      <div class="row"><img class="avatar" src="./mynassistant-mark.svg" alt="MynAssistant logosu"><div><h3>Google ile MynAssistant</h3><p>Android uygulamasıyla aynı Firebase projesine bağlanır.</p></div></div>
+      <button class="button secondary full" disabled style="margin-top:14px">Google ile devam et · Kurulum bekleniyor</button>
+      <p>Google girişini etkinleştirmek için Firebase Console'da <strong>myncloud-24</strong> projesine bir Web uygulaması kaydet ve Web SDK yapılandırmasını aşağıdaki dosyaya aktar.</p>
+      <a class="button full" href="https://console.firebase.google.com/project/myncloud-24/settings/general" target="_blank" rel="noopener">Firebase Web uygulamasını yapılandır</a>
+    </section>
+    <div class="notice warning">Bu web sitesi Render yönetim sunucusuna bağlı değildir. Hesap ve cihaz kimliği Firebase Authentication; cihaz durumu ve komut kuyruğu Cloud Firestore üzerinden yürür.</div>`;
   const register = state.authMode === "register";
   return `
     ${renderHeading(register ? "MynAssistant hesabı oluştur" : "Tekrar hoş geldin", register ? "Hesabını oluştur ve cihazlarını bağla." : "Hesabına giriş yaparak devam et.")}
@@ -284,7 +299,7 @@ function renderAccount() {
     ${renderHeading("Hesabım", "MynAssistant profil bilgilerin.")}
     <section class="card">
       <div class="row" style="margin-bottom:18px">
-        ${u.photoURL ? `<img class="avatar" src="${esc(u.photoURL)}" alt="Profil fotoğrafı">` : '<div class="avatar avatar-fallback">' + esc((u.displayName || u.email || "M").slice(0,1).toUpperCase()) + "</div>"}
+        ${u.photoURL ? `<img class="avatar" src="${esc(u.photoURL)}" alt="Profil fotoğrafı">` : '<img class="avatar" src="./mynassistant-mark.svg" alt="MynAssistant logosu">'}
         <div class="device-info"><strong>${esc(u.displayName || u.email?.split("@")[0] || "MynAssistant kullanıcısı")}</strong><span>${esc(u.email || "")}</span></div>
         <span class="pill ${u.emailVerified ? "success" : "warning"}">${u.emailVerified ? "E-posta doğrulandı" : "E-posta bekliyor"}</span>
       </div>
@@ -325,7 +340,6 @@ function renderRemoteScreenContent(device) {
     esc(device.screenJpegBase64) + '">';
 }
 function renderRemote() {
-  if (!state.user) return `${renderHeading("PC Kumandası","Bilgisayarını kontrol etmek için giriş yap.")}<section class="card"><button class="button full" data-page="auth">Giriş yap / Kayıt ol</button></section>`;
   const device = currentDevice();
   const online = device && isOnline(device) && device.connectionMode === "firebase-agent";
   const hasFrame = !!device?.screenJpegBase64;
@@ -334,6 +348,12 @@ function renderRemote() {
       <button class="icon-button" title="Ekran önizlemesi" data-action="toggle-screen">${icon("monitor")}</button>
       <button class="icon-button" title="Klavye" data-action="focus-remote-keyboard">${icon("keyboard")}</button>
     </div></div>
+    ${!state.user ? `
+      <div class="notice">
+        <strong>Yerel kullanım ile bulut bağlantısı farklıdır.</strong><br>
+        Bu ekranı ve kumanda düzenini oturum açmadan görüntüleyebilirsin. Kendi Windows cihazını internet üzerinden güvenli biçimde bulmak ve komut göndermek için MynAssistant hesabın gerekir; cihaz ve komut kayıtları Firebase'de hesap UID'siyle eşleştirilir.
+        <div style="margin-top:10px"><button class="button secondary small-button" data-page="auth">Bulut cihazını bağlamak için giriş yap</button></div>
+      </div>` : ""}
     <section class="card compact">
       <div class="row"><div class="device-icon">${icon("monitor")}</div><div class="device-info"><strong>${esc(device?.name || "Windows bilgisayar")}</strong><span>${online ? "Çevrimiçi • son heartbeat güncel" : "Çevrimdışı • Windows Agent bekleniyor"}</span></div><span class="status-dot ${online ? "online" : ""}"></span></div>
       <div class="row wrap" style="margin-top:12px">
