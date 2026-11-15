@@ -12,4 +12,3 @@ export const firebaseConfig = Object.freeze({
   appId: ""
 });
 
-export const SERVER_BASE_URL = "https://mynassistant-server.onrender.com";
