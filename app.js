@@ -359,7 +359,7 @@ function renderRemote() {
       <div class="row wrap" style="margin-top:12px">
         <label class="muted tiny" for="remote-device">Kontrol edilecek cihaz</label>
         <select class="select" id="remote-device" style="flex:1;min-width:170px">
-          ${pcDevices().map(d=>`<option value="${esc(d.id)}" ${device?.id===d.id?"selected":""}>${esc(d.name || "Windows bilgisayar")} • ${isOnline(d)?"Çevrimiçi":"Çevrimdışı"}</option>`).join("")}
+          ${pcDevices().length ? pcDevices().map(d=>`<option value="${esc(d.id)}" ${device?.id===d.id?"selected":""}>${esc(d.name || "Windows bilgisayar")} • ${isOnline(d)?"Çevrimiçi":"Çevrimdışı"}</option>`).join("") : '<option value="">Giriş yaptığında bağlı Windows bilgisayarın burada görünür</option>'}
         </select>
       </div>
     </section>
@@ -876,6 +876,12 @@ async function handleAuthForm(form) {
 async function googleLogin() {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({prompt:"select_account"});
+  // Mobile Chrome and in-app browsers handle Firebase Google auth more reliably via redirect.
+  const mobileBrowser = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  if (mobileBrowser) {
+    await signInWithRedirect(auth,provider);
+    return;
+  }
   try { await signInWithPopup(auth,provider); }
   catch(error) {
     if (["auth/popup-blocked","auth/popup-closed-by-user","auth/cancelled-popup-request"].includes(error?.code)) {
