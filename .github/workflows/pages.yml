@@ -1,0 +1,53 @@
+name: Deploy MynAssistant Web to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check JavaScript syntax
+        run: |
+          node --input-type=module --check < app.js
+          node --check service-worker.js
+
+      - name: Validate PWA manifest
+        run: python -m json.tool manifest.webmanifest > /dev/null
+
+      - name: Verify web entry points
+        run: |
+          test -s index.html
+          test -s styles.css
+          test -s app.js
+          test -s firebase-config.js
+          test -s mynassistant-mark.svg
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: Publish website
+        id: deployment
+        uses: actions/deploy-pages@v4
