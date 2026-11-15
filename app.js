@@ -883,6 +883,11 @@ async function saveProfile(form) {
 
 function startApp() {
   appRoot.innerHTML = '<div class="boot-screen"><img src="./mynassistant-mark.svg" alt="" width="58" height="58"><strong>MynAssistant</strong><span>Firebase bağlantısı kuruluyor…</span><div class="progress" style="width:150px"><span></span></div></div>';
+  if (!firebaseConfig.appId || !firebaseConfig.apiKey || !firebaseConfig.projectId) {
+    appRoot.className = "app-main";
+    appRoot.innerHTML = '<section class="card"><h2>Firebase Web uygulaması kurulumu gerekli</h2><p>Firebase Console içinde myncloud-24 projesine bir Web uygulaması ekle ve Web SDK yapılandırmasını firebase-config.js dosyasına kopyala. Android uygulama kimliğini Web appId yerine kullanma.</p><a class="button secondary" href="https://console.firebase.google.com/project/myncloud-24/settings/general" target="_blank" rel="noopener">Firebase proje ayarlarını aç</a></section>';
+    return;
+  }
   try {
     const app = initializeApp(firebaseConfig);
     auth = getAuth(app);
