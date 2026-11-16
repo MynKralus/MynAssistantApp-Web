@@ -178,6 +178,7 @@ function pageTitle() {
 }
 function navigate(page) {
   if (!["home","auth","account","devices","settings","remote","files","diagnostics"].includes(page)) return;
+  if (page !== "settings") stopDesktopQrScan();
   if (state.page === "remote" && page !== "remote") stopScreenPreview();
   state.page = page;
   state.drawerOpen = false;
@@ -694,7 +695,7 @@ function renderTargetDialog() {
   const androids = androidDevices();
   const windowsBody = !state.user ? '<div class="target-empty">Windows cihazlarını görmek için giriş yap.</div>' : state.devicesLoading ? '<div class="target-empty">Cihazlar yükleniyor…</div>' : state.devicesError ? '<div class="target-empty">' + esc(state.devicesError) + ' <button class="link-button" data-action="refresh-devices">Yeniden dene</button></div>' : windows.length ? windows.map(d => choose("PC", d.id)).join("") : '<div class="target-empty">Bu hesapta kayıtlı Windows cihazı bulunamadı.</div>';
   const androidBody = !state.user ? '<div class="target-empty">Android cihazlarını görmek için giriş yap.</div>' : androids.length ? androids.map(d => choose("ANDROID", d.id)).join("") : '<div class="target-empty">Bu hesaba kayıtlı başka Android cihazı bulunamadı.</div>';
-  return '<div class="target-modal-backdrop" data-action="close-target-picker"><section class="target-modal" role="dialog" aria-modal="true" aria-labelledby="target-modal-title" onclick="event.stopPropagation()">' +
+  return '<div class="target-modal-backdrop" data-action="close-target-picker"><section class="target-modal" role="dialog" aria-modal="true" aria-labelledby="target-modal-title">' +
     '<div class="target-modal-head"><h2 id="target-modal-title">Komut hedefi ve cihaz seç</h2><button class="icon-button" data-action="close-target-picker" aria-label="Kapat">' + icon("close") + '</button></div>' +
     '<div class="target-modal-scroll"><h3>Komut hedefi</h3>' + choose("AUTO") + choose("PHONE") +
     '<h3>Kayıtlı Windows cihazları</h3>' + windowsBody +
@@ -1294,20 +1295,44 @@ let auth;
 let db;
 
 document.addEventListener("click", async event => {
-  const button = event.target.closest("[data-page],[data-action],[data-tab],[data-command]");
+  if (event.target.closest(".target-modal") && !event.target.closest("[data-action],[data-target],[data-page]")) return;
+  const button = event.target.closest("[data-page],[data-action],[data-tab],[data-command],[data-target]");
   if (!button || button.disabled) return;
   const page = button.dataset.page, action = button.dataset.action, tab = button.dataset.tab;
   try {
     if (page) {
       if (page === "auth" && !state.user) state.authMode="login";
       navigate(page);
-    } else if (tab) { state.settingsTab=tab; render(); }
+    } else if (tab) { if (tab !== "Agent") stopDesktopQrScan(); state.settingsTab=tab; render(); }
+    else if (button.dataset.target) {
+      const selected = button.dataset.target;
+      const id = button.dataset.targetId || "";
+      state.commandTargetId = selected;
+      if (selected === "PC" && id) { state.selectedDeviceId = id; storageSet("myn-selected-device",id); }
+      if (selected === "ANDROID" && id) { state.selectedAndroidDeviceId = id; storageSet("myn-selected-android-device",id); }
+      storageSet("myn-command-target",selected);
+      state.targetDialogOpen = false;
+      state.feedback = "";
+      render();
+    }
     else if (button.dataset.command) {
       const device=currentDevice();
       if (!device || !isOnline(device)) throw new Error("Windows Agent çevrimdışı.");
       await enqueueCommand(device,button.dataset.command,{});
     } else if (action === "drawer-open") { state.drawerOpen=true; render(); }
     else if (action === "drawer-close") { state.drawerOpen=false; render(); }
+    else if (action === "account-list-toggle") { state.accountListExpanded=!state.accountListExpanded; render(); }
+    else if (action === "open-target-picker") { state.targetDialogOpen=true; render(); }
+    else if (action === "close-target-picker") { state.targetDialogOpen=false; render(); }
+    else if (action === "select-android-device") { state.selectedAndroidDeviceId=button.dataset.id; state.commandTargetId="ANDROID"; storageSet("myn-selected-android-device",button.dataset.id); storageSet("myn-command-target","ANDROID"); showToast("Android cihaz komut hedefi olarak seçildi."); render(); }
+    else if (action === "toggle-remote-touchpad") { state.remoteTouchpadEnabled=!state.remoteTouchpadEnabled; storageSet("myn-remote-touchpad",state.remoteTouchpadEnabled); render(); }
+    else if (action === "toggle-remote-keyboard") { state.remoteKeyboardEnabled=!state.remoteKeyboardEnabled; storageSet("myn-remote-keyboard",state.remoteKeyboardEnabled); render(); }
+    else if (action === "choose-profile-photo") { document.getElementById("profile-photo-input")?.click(); }
+    else if (action === "toggle-phone-form") { state.phoneEditOpen=!state.phoneEditOpen; render(); }
+    else if (action === "link-google") { await linkGoogleAccount(); }
+    else if (action === "scan-desktop-qr") { await startDesktopQrScan(); }
+    else if (action === "stop-desktop-qr") { stopDesktopQrScan(); render(); }
+    else if (action === "approve-desktop-pairing") { await approveDesktopPairing(); }
     else if (action === "toggle-theme") { setTheme(state.theme==="dark"?"light":"dark"); render(); }
     else if (action === "toggle-auth") { state.authMode=state.authMode==="register"?"login":"register"; state.feedback=""; render(); }
     else if (action === "google-login") { try { await googleLogin(); } catch(error) { state.feedback=friendlyAuthError(error,"google"); logIssue("MYN-WEB-AUTH-003","Google girişi",state.feedback,error?.code || ""); render(); } }
@@ -1371,7 +1396,15 @@ document.addEventListener("click", async event => {
   }
 });
 document.addEventListener("submit", async event => {
-  if (event.target.id==="auth-form") {
+  if (event.target.id==="desktop-pairing-form") {
+    event.preventDefault();
+    state.pairingCode=String(new FormData(event.target).get("code") || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+    await approveDesktopPairing();
+  } else if (event.target.id==="phone-form") {
+    event.preventDefault();
+    try { await savePendingPhoneNumber(new FormData(event.target).get("phone")); }
+    catch(error) { state.profileMessage=error?.message || "Telefon numarası kaydedilemedi."; render(); }
+  } else if (event.target.id==="auth-form") {
     event.preventDefault();
     const button=event.target.querySelector('button[type="submit"]');
     if (button) button.disabled=true;
@@ -1398,6 +1431,10 @@ document.addEventListener("change", async event => {
     state.filesDeviceId=el.value; state.fileListing=null; render();
   } else if (el.id==="command-target") {
     state.commandTargetId=el.value;
+  } else if (el.id==="profile-photo-input") {
+    const file=el.files?.[0]; if (!file) return;
+    await uploadProfilePhoto(file);
+    el.value="";
   } else if (el.id==="files-upload-input") {
     const file=el.files?.[0]; if (!file) return;
     try { await uploadPcFile(file); } catch(error) { logIssue("MYN-WEB-FILES-002","Dosya yükleme",error?.message || "Dosya yüklenemedi."); }
@@ -1406,6 +1443,7 @@ document.addEventListener("change", async event => {
 });
 document.addEventListener("input", event => {
   if(event.target.id==="command-input") state.commandText=event.target.value;
+  else if(event.target.id==="desktop-pairing-code") state.pairingCode=event.target.value.replace(/[^A-Za-z0-9]/g,"").toUpperCase().slice(0,10);
 });
 
 // Touchpad: single click, long-press right click, drag sends relative pointer movement.
@@ -1450,7 +1488,7 @@ window.addEventListener("error",event=>{
 window.addEventListener("unhandledrejection",event=>{
   logIssue("MYN-WEB-RUNTIME-002","İşlem",event.reason?.message || "Beklenmeyen asenkron hata.");
 });
-window.addEventListener("beforeunload",()=>stopScreenPreview());
+window.addEventListener("beforeunload",()=>{ stopScreenPreview(); stopDesktopQrScan(); });
 
 startApp().catch(error => {
   logIssue("MYN-WEB-BOOT-001","Uygulama başlatma","MynAssistant başlatılamadı. Sayfayı yenileyip tekrar dene.",error?.message || "");
