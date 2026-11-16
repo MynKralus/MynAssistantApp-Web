@@ -31,6 +31,7 @@ const ICONS = {
   home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   devices: '<rect x="3" y="4" width="13" height="12" rx="2"/><path d="M8 20h3m-1.5-4v4m8-9h3v9h-7v-3"/>',
+  touchpad: '<rect x="4" y="2.5" width="16" height="19" rx="7"/><path d="M12 15V7m0 0-2.3 2.3M12 7l2.3 2.3M7.5 15.5h9"/>',
   settings: '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/><path d="m19.4 15 .1.1 1.4 1.1-1.4 2.4-1.7-.7a8 8 0 0 1-1.5.9l-.3 1.8h-2.8l-.3-1.8a8 8 0 0 1-1.5-.9l-1.7.7-1.4-2.4 1.4-1.1a7 7 0 0 1 0-1.8l-1.4-1.1 1.4-2.4 1.7.7a8 8 0 0 1 1.5-.9l.3-1.8h2.8l.3 1.8a8 8 0 0 1 1.5.9l1.7-.7 1.4 2.4-1.4 1.1a7 7 0 0 1 0 1.8Z" transform="translate(-1 -1) scale(1.08)"/>',
   remote: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4m-5-10 2-2 2 2m2 0 2-2 2 2"/>',
   folder: '<path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
@@ -382,7 +383,7 @@ function renderRemote() {
   return `${renderHeading("PC Kumandası","Windows bilgisayarını uzaktan yönet.")}
     <div class="remote-toolbar">
       <button class="remote-tool ${state.remoteScreenEnabled ? "active" : ""}" data-action="toggle-screen" aria-pressed="${state.remoteScreenEnabled}" title="Ekran önizlemesi">${icon("monitor")}</button>
-      <button class="remote-tool ${state.remoteTouchpadEnabled ? "active" : ""}" data-action="toggle-remote-touchpad" aria-pressed="${state.remoteTouchpadEnabled}" title="Touchpad">${icon("devices")}</button>
+      <button class="remote-tool ${state.remoteTouchpadEnabled ? "active" : ""}" data-action="toggle-remote-touchpad" aria-pressed="${state.remoteTouchpadEnabled}" title="Touchpad">${icon("touchpad")}</button>
       <button class="remote-tool ${state.remoteKeyboardEnabled ? "active" : ""}" data-action="toggle-remote-keyboard" aria-pressed="${state.remoteKeyboardEnabled}" title="Klavye">${icon("keyboard")}</button>
     </div>
     ${!state.user ? '<div class="notice">PC Kumandası arayüzünü görüntüleyebilirsin. Bulut üzerinden kendi Windows cihazını seçmek ve komut göndermek için MynAssistant hesabında oturum aç.</div>' : ""}
@@ -1333,7 +1334,7 @@ let auth;
 let db;
 
 document.addEventListener("click", async event => {
-  if (event.target.closest(".target-modal") && !event.target.closest("[data-action],[data-target],[data-page]")) return;
+  if (event.target.closest(".target-modal") && !event.target.closest(".target-modal [data-action], .target-modal [data-target], .target-modal [data-page]")) return;
   const button = event.target.closest("[data-page],[data-action],[data-tab],[data-command],[data-target]");
   if (!button || button.disabled) return;
   const page = button.dataset.page, action = button.dataset.action, tab = button.dataset.tab;
