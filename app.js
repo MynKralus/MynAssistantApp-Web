@@ -512,7 +512,7 @@ function renderComposer() {
   const pc = currentDevice();
   const android = androidDevices().find(device => device.id === state.selectedAndroidDeviceId);
   const targetDescription = state.commandTargetId === "PC" ? (pc ? deviceDisplayName(pc) : "Windows bilgisayar bekleniyor") :
-    state.commandTargetId === "ANDROID" ? (android ? deviceDisplayName(android) : "Android cihaz seçilmedi") :
+    state.commandTargetId === "ANDROID" ? (selectedAndroid ? deviceDisplayName(selectedAndroid) : "Android cihaz seçilmedi") :
     state.commandTargetId === "PHONE" ? "Bu telefon (Android)" : "Komuta göre telefon veya kullanılabilir bilgisayar";
   return '<div class="composer-wrap"><form class="composer android-composer" id="command-form">' +
     '<div class="composer-top"><button type="button" class="composer-target" data-action="open-target-picker">' + icon("plus") + '<span>' + esc(commandTargetLabel()) + '</span><span class="target-chevron">⌄</span></button><span class="muted tiny composer-target-description">' + esc(targetDescription) + '</span></div>' +
@@ -629,6 +629,18 @@ function normalizeText(value) {
     .replaceAll("ü","u").replaceAll("ö","o").replaceAll("ç","c")
     .replace(/\s+/g," ").trim();
 }
+function isAllowedAndroidTextCommand(raw) {
+  const value = normalizeText(raw);
+  const allowed = new Set([
+    "ses artir","sesi artir","sesini artir","ses yukselt","sesi yukselt","ses arttir","sesi arttir",
+    "ses azalt","sesi azalt","sesini azalt","ses kis","sesi kis","sessize al","sesi kapat","sesini kapat",
+    "medya sesini kapat","medya sesini sessize al","medya sesini ac","sessizden cikar",
+    "bluetooth ayarlarini ac","bluetooth ac","bluetoothu ac","wifi ayarlarini ac","wi-fi ayarlarini ac","wifi ac","wi-fi ac","kablosuz ag ayarlarini ac",
+    "ayarlari ac","telefon ayarlarini ac","android ayarlarini ac","arama ekranini ac","telefon uygulamasini ac","arama ac","telefonu ac",
+    "chrome ac","tarayici ac","internet ac","google ac","youtube ac","youtubeu ac","play store ac","play storeu ac"
+  ]);
+  return allowed.has(value) && value.length <= 120;
+}
 function isAllowedTextCommand(raw) {
   const value = normalizeText(raw);
   const exact = new Set([
@@ -650,8 +662,14 @@ function isAllowedTextCommand(raw) {
 }
 async function enqueueCommand(device, command, payload = {}, timeoutMs = COMMAND_TIMEOUT_MS) {
   if (!state.user) throw new Error("Devam etmek için önce giriş yap.");
-  if (!device || device.connectionMode !== "firebase-agent" || !isOnline(device)) {
-    throw new Error("Seçili Windows Agent çevrimiçi değil. Komut gönderilmedi.");
+  const androidTarget = isAndroidDevice(device);
+  if (!device || !isOnline(device)) throw new Error("Seçili cihaz çevrimiçi değil. Komut gönderilmedi.");
+  if (androidTarget) {
+    if (command !== "text_command" || !isAllowedAndroidTextCommand(payload.text || "")) {
+      throw new Error("Bu Android komutu uzaktan çalıştırma izin listesinde bulunmuyor. Yalnızca temel ses, ayar ve uygulama açma komutları kabul edilir.");
+    }
+  } else if (device.connectionMode !== "firebase-agent") {
+    throw new Error("Seçili Windows Agent bulut bağlantısında değil. Komut gönderilmedi.");
   }
   if (state.busy) throw new Error("Önceki işlem tamamlanmalı. Yinelenen komut gönderilmedi.");
   state.busy = true;
@@ -708,21 +726,51 @@ async function enqueueCommand(device, command, payload = {}, timeoutMs = COMMAND
   }
 }
 async function sendTextCommand(raw) {
-  const text = String(raw || "").trim();
-  if (!text) { showToast("Önce bir komut yaz."); return; }
-  if (text.length > 1000) { showToast("Komut en fazla 1.000 karakter olabilir."); return; }
-  if (!isAllowedTextCommand(text)) {
-    showToast("Bu komut mevcut Windows Agent izin listesinde bulunmuyor. Desteklenen komutları kullan.");
-    state.feedback = "Güvenlik nedeniyle desteklenmeyen komut gönderilmedi.";
-    render();
-    return;
+  const original = String(raw || "").trim();
+  if (!original) { showToast("Önce bir komut yaz."); return; }
+  if (original.length > 1000) { showToast("Komut en fazla 1.000 karakter olabilir."); return; }
+  if (!state.user) {
+    state.feedback = "Cihazlara komut göndermek için MynAssistant hesabına giriş yap.";
+    navigate("auth"); showToast(state.feedback); return;
   }
-  const device = state.commandTargetId === "AUTO"
-    ? currentDevice() : pcDevices().find(d=>d.id===state.commandTargetId);
-  if (!device) { showToast("Bağlı Windows bilgisayarı bulunamadı."); return; }
+  if (state.commandTargetId === "PHONE") {
+    state.feedback = "Bu web sayfası Android işletim sistemine doğrudan komut gönderemez. Telefonun yerel komutları için MynAssistant Android uygulamasını kullan.";
+    showToast(state.feedback); render(); return;
+  }
+  let device = null;
+  let commandText = original;
+  let androidTarget = false;
+  if (state.commandTargetId === "ANDROID") {
+    device = androidDevices().find(d => d.id === state.selectedAndroidDeviceId) || null;
+    androidTarget = true;
+    if (!device) { showToast("Önce kayıtlı bir Android cihaz seç."); return; }
+    if (!isAllowedAndroidTextCommand(original)) {
+      state.feedback = "Bu Android komutu uzaktan otomatik çalıştırılmadı. Ses, ayar ve uygulama açma izin listesindeki komutları kullan. Arama, mesaj ve özel içerik işlemleri için cihazda yerel onay gerekir.";
+      showToast(state.feedback); render(); return;
+    }
+  } else if (state.commandTargetId === "PC") {
+    device = pcDevices().find(d => d.id === state.selectedDeviceId) || currentDevice();
+    commandText = original.replace(/^(?:bilgisayara|windows bilgisayara)\s+/i,"").trim() || original;
+  } else {
+    const pcPrefix = /^(?:bilgisayara|windows bilgisayara)\s+/i;
+    if (pcPrefix.test(original) || isAllowedTextCommand(original)) {
+      device = currentDevice();
+      commandText = original.replace(pcPrefix,"").trim() || original;
+    } else {
+      state.feedback = "Otomatik hedef bu komutun hangi cihaza gideceğini belirleyemedi. Windows komutu için PC hedefini, başka bir telefonu kontrol etmek için kayıtlı Android cihazını seç.";
+      showToast(state.feedback); render(); return;
+    }
+  }
+  if (!device) { showToast(androidTarget ? "Android cihaz bulunamadı." : "Bağlı Windows bilgisayarı bulunamadı."); return; }
+  if (!isOnline(device)) { showToast("Seçilen cihaz çevrimdışı. Komut başka bir cihaza yönlendirilmedi."); return; }
+  if (!androidTarget && !isAllowedTextCommand(commandText)) {
+    state.feedback = "Bu komut mevcut Windows Agent izin listesinde bulunmuyor. Desteklenen komut gönderilmedi.";
+    showToast(state.feedback); render(); return;
+  }
   state.commandText = "";
-  try { await enqueueCommand(device,"text_command",{text}); }
-  catch {}
+  state.commandTargetId = androidTarget ? "ANDROID" : "PC";
+  storageSet("myn-command-target", state.commandTargetId);
+  try { await enqueueCommand(device,"text_command",{text:commandText}); } catch {}
 }
 
 async function startScreenPreview() {
