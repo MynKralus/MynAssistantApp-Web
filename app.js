@@ -433,6 +433,153 @@ function formatBytes(value) {
   return (n/(1024*1024)).toFixed(2) + " MB";
 }
 
+function stopDesktopQrScan() {
+  state.pairingScannerActive = false;
+  if (state.pairingScanFrame) cancelAnimationFrame(state.pairingScanFrame);
+  state.pairingScanFrame = null;
+  if (state.pairingStream) { state.pairingStream.getTracks().forEach(track => track.stop()); state.pairingStream = null; }
+}
+function parseDesktopPairingQr(rawValue) {
+  const parts = String(rawValue || "").trim().split(":",4);
+  if (parts.length !== 4 || parts[0].toUpperCase() !== "MYNASSISTANT-PAIR") return null;
+  const code = parts[1].replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+  const codeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const expiresAtUnix = Number(parts[2]);
+  const signature = parts[3];
+  if (code.length !== 10 || [...code].some(ch => !codeAlphabet.includes(ch))) return null;
+  if (!Number.isSafeInteger(expiresAtUnix) || expiresAtUnix <= Math.floor(Date.now()/1000)) return null;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(signature)) return null;
+  return {code, expiresAtUnix, signature};
+}
+async function startDesktopQrScan() {
+  if (!state.user) { state.pairingStatus = "QR eşleştirmesi için önce MynAssistant hesabına giriş yap."; render(); return; }
+  if (!navigator.mediaDevices?.getUserMedia) { state.pairingStatus = "Bu tarayıcı kamera erişimini desteklemiyor. 10 karakterli kodu elle girebilirsin."; render(); return; }
+  if (!("BarcodeDetector" in window)) { state.pairingStatus = "Bu tarayıcı yerel QR algılamayı desteklemiyor. 10 karakterli kodu elle gir."; render(); return; }
+  try {
+    stopDesktopQrScan();
+    state.pairingStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"}},audio:false});
+    state.pairingScannerActive = true;
+    state.pairingStatus = "Windows uygulamasındaki MynAssistant QR kodunu kameraya göster.";
+    render();
+    const video = document.getElementById("pairing-camera-video");
+    if (!video) throw new Error("QR kamera alanı oluşturulamadı.");
+    video.srcObject = state.pairingStream;
+    await video.play();
+    const detector = new BarcodeDetector({formats:["qr_code"]});
+    const scanFrame = async () => {
+      if (!state.pairingScannerActive || !video.isConnected) return;
+      try {
+        const codes = await detector.detect(video);
+        const value = codes[0]?.rawValue;
+        if (value) {
+          const parsed = parseDesktopPairingQr(value);
+          if (parsed) {
+            state.pairingCode = parsed.code;
+            state.pairingQrSignature = parsed.signature;
+            state.pairingQrExpiresAtUnix = parsed.expiresAtUnix;
+            state.pairingStatus = "QR kodu okundu. Bilgisayarı hesabına bağlamak için onayı tamamla.";
+            stopDesktopQrScan(); render(); return;
+          }
+          state.pairingStatus = "QR kod biçimi geçersiz veya süresi dolmuş. Windows uygulamasından yeni QR kodu al.";
+          render();
+        }
+      } catch(error) {
+        state.pairingStatus = "QR kodu okunamadı: " + (error?.message || "kamera hatası");
+        stopDesktopQrScan(); render(); return;
+      }
+      state.pairingScanFrame = requestAnimationFrame(scanFrame);
+    };
+    state.pairingScanFrame = requestAnimationFrame(scanFrame);
+  } catch(error) {
+    stopDesktopQrScan();
+    state.pairingStatus = error?.name === "NotAllowedError" ? "Kamera izni reddedildi. Tarayıcı ayarlarından kamera izni ver veya kodu elle gir." : error?.message || "QR tarayıcı başlatılamadı.";
+    render();
+  }
+}
+async function approveDesktopPairing() {
+  if (!state.user) throw new Error("Windows bilgisayarını eşleştirmek için MynAssistant hesabına giriş yap.");
+  if (state.pairingBusy) return;
+  const code = String(state.pairingCode || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  if (code.length !== 10 || [...code].some(ch => !alphabet.includes(ch))) {
+    state.pairingStatus = "Windows uygulamasında gösterilen 10 karakterli kodu gir.";
+    render(); return;
+  }
+  const hasSignature = !!state.pairingQrSignature;
+  if (hasSignature !== !!state.pairingQrExpiresAtUnix) { state.pairingStatus = "QR imza bilgisi eksik. QR kodunu yeniden tara veya kodu elle gir."; render(); return; }
+  if (hasSignature && state.pairingQrExpiresAtUnix <= Math.floor(Date.now()/1000)) { state.pairingStatus = "QR kodunun süresi doldu. Windows uygulamasından yeni kod al."; state.pairingQrSignature = ""; state.pairingQrExpiresAtUnix = 0; render(); return; }
+  state.pairingBusy = true; state.pairingStatus = "Telefon hesabı doğrulanıyor…"; render();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const token = await state.user.getIdToken(false);
+    if (!token) throw new Error("Firebase oturumu doğrulanamadı. Yeniden giriş yap.");
+    const payload = {code};
+    if (hasSignature) { payload.qrSignature = state.pairingQrSignature; payload.qrExpiresAtUnix = state.pairingQrExpiresAtUnix; }
+    const response = await fetch("https://mynassistant-server.onrender.com/api/v1/desktop/pairing/approve",{
+      method:"POST", signal:controller.signal, headers:{Accept:"application/json","Content-Type":"application/json",Authorization:"Bearer "+token}, body:JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = body.detail || body.message || body.title;
+      throw new Error(detail || (response.status === 503 ? "Eşleştirme servisi henüz yapılandırılmadı." : "Eşleştirme onaylanamadı (HTTP "+response.status+")."));
+    }
+    state.pairingStatus = (body.message || "Bilgisayar hesabınla eşleştirildi.") + (body.machineName ? " Bilgisayar: "+body.machineName+"." : "");
+    state.pairingCode = ""; state.pairingQrSignature = ""; state.pairingQrExpiresAtUnix = 0;
+    showToast(state.pairingStatus);
+    subscribeDevices();
+  } catch(error) {
+    const message = error?.name === "AbortError" ? "Eşleştirme sunucusu zamanında yanıt vermedi. Tekrar dene." : error?.message || "Eşleştirme isteği tamamlanamadı.";
+    state.pairingStatus = message;
+    logIssue("MYN-WEB-PAIR-001","Windows eşleştirme",message,error?.name || "");
+  } finally {
+    clearTimeout(timeout); state.pairingBusy = false; render();
+  }
+}
+async function savePendingPhoneNumber(rawNumber) {
+  if (!state.user) throw new Error("Telefon numarası kaydetmek için giriş yap.");
+  const number = String(rawNumber || "").trim();
+  const normalized = number.replace(/[\s()-]/g,"");
+  if (!/^\+?[1-9]\d{7,14}$/.test(normalized)) throw new Error("Telefon numarasını ülke koduyla gir. Örnek: +905XXXXXXXXX.");
+  await setDoc(doc(db,"users",state.user.uid),{pendingPhoneNumber:normalized,pendingPhoneVerified:false,updatedAt:serverTimestamp()},{merge:true});
+  state.profile = {...(state.profile || {}),pendingPhoneNumber:normalized,pendingPhoneVerified:false};
+  state.profileMessage = "Telefon numarası kaydedildi ancak henüz doğrulanmadı. Android uygulamasındaki mevcut ücretsiz mod gerçek SMS göndermediği için bu web ekranı da SMS göndermez.";
+  render();
+}
+async function linkGoogleAccount() {
+  if (!state.user) throw new Error("Önce MynAssistant hesabına giriş yap.");
+  const provider = new GoogleAuthProvider(); provider.setCustomParameters({prompt:"select_account",hl:"tr"});
+  await linkWithPopup(state.user,provider);
+  await reload(state.user); state.user = auth.currentUser;
+  state.profileMessage = "Google hesabı MynAssistant hesabına bağlandı.";
+  render();
+}
+async function uploadProfilePhoto(file) {
+  if (!state.user) throw new Error("Profil fotoğrafı yüklemek için giriş yap.");
+  if (!(file instanceof File) || !["image/jpeg","image/png","image/webp"].includes(file.type)) throw new Error("JPG, PNG veya WebP türünde bir fotoğraf seç.");
+  if (file.size > 5*1024*1024) throw new Error("Profil fotoğrafı en fazla 5 MB olabilir.");
+  state.profilePhotoBusy = true; state.profileMessage = "Profil fotoğrafı hazırlanıyor…"; render();
+  try {
+    const token = await state.user.getIdToken(true);
+    const signed = await fetch("https://mynassistant-server.onrender.com/api/v1/account/profile-photo/sign",{method:"POST",headers:{Accept:"application/json",Authorization:"Bearer "+token}});
+    const signature = await signed.json().catch(()=>({}));
+    if (!signed.ok) throw new Error(signature.detail || signature.title || "Profil fotoğrafı servisi hazır değil.");
+    const form = new FormData(); form.append("file",file); form.append("api_key",signature.apiKey); form.append("timestamp",String(signature.timestamp)); form.append("public_id",signature.publicId); form.append("overwrite",signature.overwrite ? "true" : "false"); form.append("signature",signature.signature);
+    const uploaded = await fetch("https://api.cloudinary.com/v1_1/"+encodeURIComponent(signature.cloudName)+"/image/upload",{method:"POST",body:form});
+    const result = await uploaded.json().catch(()=>({}));
+    if (!uploaded.ok || typeof result.secure_url !== "string") throw new Error(result.error?.message || "Fotoğraf yüklenemedi.");
+    const url = new URL(result.secure_url);
+    if (url.protocol !== "https:" || url.hostname !== "res.cloudinary.com") throw new Error("Fotoğraf adresi güvenlik kontrolünden geçmedi.");
+    await updateProfile(state.user,{photoURL:url.href});
+    await setDoc(doc(db,"users",state.user.uid),{photoUrl:url.href,updatedAt:serverTimestamp()},{merge:true});
+    await reload(state.user); state.user = auth.currentUser;
+    state.profileMessage = "Profil fotoğrafın güncellendi.";
+  } catch(error) {
+    state.profileMessage = error?.message || "Profil fotoğrafı yüklenemedi.";
+    logIssue("MYN-WEB-PROFILE-003","Profil fotoğrafı",state.profileMessage,error?.code || "");
+  } finally { state.profilePhotoBusy = false; render(); }
+}
+
 function renderSettings() {
   const tab = state.settingsTab;
   let body = "";
@@ -447,16 +594,26 @@ function renderSettings() {
     body = `
       <section class="card">
         <h3>Otomatik bilgisayar bağlantısı</h3>
-        <p>Windows MynAssistant uygulamasında Android ile aynı Google hesabıyla oturum aç. Cihaz Firestore üzerinden otomatik listelenir.</p>
+        <p>Windows MynAssistant uygulamasında bu hesapla oluşturulan cihaz kaydı Firestore üzerinden görünür.</p>
         <div class="row between" style="margin-top:15px"><strong>Windows Agent durumu</strong><span class="pill ${online.length?"success":"warning"}">${online.length?"Çevrimiçi":"Bağlı cihaz bekleniyor"}</span></div>
-        <p>${online.length ? online.map(d=>esc(d.name||"Windows bilgisayar")).join(", ") : "Bu hesaba ait çevrimiçi Windows Agent bulunamadı."}</p>
+        <p>${online.length ? online.map(d=>esc(deviceDisplayName(d))).join(", ") : "Bu hesaba ait çevrimiçi Windows Agent bulunamadı."}</p>
         <button class="button secondary full" data-page="devices" style="margin-top:12px">Cihazlarımı gör</button>
+        <button class="button ghost full" data-action="refresh-devices" style="margin-top:8px">Bağlantıyı yenile</button>
       </section>
       <section class="card">
-        <h3>Telefon-PC bağlantısı</h3>
-        <p>Web sürümü aynı Firebase cihaz kayıtlarını okur. Bilgisayarın Agent heartbeat'i 3 dakika içinde gelmiyorsa çevrimdışı kabul edilir.</p>
-        <button class="button secondary full" data-action="refresh-devices" style="margin-top:12px">Bağlantıyı yenile</button>
-      </section>`;
+        <div class="row"><div class="device-icon">${icon("monitor")}</div><div class="device-info"><strong>Windows bilgisayarını eşleştir</strong><span>Windows uygulamasındaki tek kullanımlık kodla</span></div></div>
+        <p>Windows uygulamasında gösterilen 10 karakterli eşleştirme kodunu gir veya QR kodunu tara. Kod 5 dakika içinde sona erer.</p>
+        <form id="desktop-pairing-form" class="form-stack" style="margin-top:14px">
+          <div class="field"><label for="desktop-pairing-code">Windows eşleştirme kodu</label><input class="input pairing-code-input" id="desktop-pairing-code" name="code" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="ABCDE23456" value="${esc(state.pairingCode)}" ${state.pairingBusy ? "disabled" : ""}></div>
+          <p class="muted tiny">Yalnızca kod girilir; telefon hesabının oturum anahtarları paylaşılmaz.</p>
+          <button class="button secondary full" type="button" data-action="scan-desktop-qr" ${state.pairingBusy || state.pairingScannerActive ? "disabled" : ""}>${icon("devices")} QR kodunu tara</button>
+          ${state.pairingScannerActive ? '<div class="pairing-camera-wrap"><video id="pairing-camera-video" autoplay playsinline muted></video><button class="button ghost full" type="button" data-action="stop-desktop-qr">Taramayı kapat</button></div>' : ""}
+          <button class="button full" type="submit" ${state.pairingBusy || !state.user ? "disabled" : ""}>${state.pairingBusy ? "Bilgisayar bağlanıyor…" : "Bilgisayarı bağla"}</button>
+        </form>
+        <p class="pairing-status" role="status">${esc(state.pairingStatus)}</p>
+        ${!state.user ? '<button class="button secondary full" data-page="auth">Giriş yap / Kayıt ol</button>' : ""}
+      </section>
+      <section class="card"><h3>Bağlantı güvenliği</h3><p>Onay Firebase ID token ile yapılır. Yönetici paneli parolası ve sunucu servis anahtarları web tarayıcısına gönderilmez.</p></section>`;
   } else if (tab === "Hesap") {
     body = `<section class="card"><h3>Hesap ve profil</h3><p>${state.user ? "MynAssistant hesabın etkin." : "Şu anda giriş yapılmamış."}</p><button class="button full" data-page="${state.user?"account":"auth"}" style="margin-top:12px">${state.user?"Hesap ve profil ayarları":"Giriş yap / Kayıt ol"}</button></section>`;
   } else if (tab === "İzinler") {
