@@ -3,8 +3,7 @@ import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, setPersistence, browserLocalPersistence,
   createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect,
   getRedirectResult, GoogleAuthProvider, linkWithPopup, signOut, updateProfile, reload,
-  PhoneAuthProvider, RecaptchaVerifier, updatePhoneNumber,
-  sendEmailVerification, sendPasswordResetEmail, verifyBeforeUpdateEmail
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
   getFirestore, collection, query, where, onSnapshot, doc, updateDoc,
@@ -12,7 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
-const APP_VERSION = "0.1.0-web";
+const APP_VERSION = "0.2.0-web";
 const MAX_TRANSFER_BYTES = 500_000;
 const COMMAND_TIMEOUT_MS = 90_000;
 const ONLINE_WINDOW_MS = 180_000;
@@ -117,10 +116,10 @@ function isOnline(device) {
     (Date.now() - timeMillis(device?.lastSeenAt)) <= ONLINE_WINDOW_MS;
 }
 function pcDevices() {
-  return state.devices.filter(d =>
+  return state.devices.filter(d => !isAndroidDevice(d) && (
     String(d.connectionMode || "") === "firebase-agent" ||
     /windows|pc/i.test(String(d.platform || d.type || d.os || ""))
-  );
+  ));
 }
 function onlinePcDevices() { return pcDevices().filter(isOnline); }
 function androidDevices() {
@@ -229,7 +228,7 @@ function renderHeading(title, subtitle = "") {
 }
 function renderDeviceCard(device, showActions = true) {
   const online = isOnline(device);
-  const pc = String(device.connectionMode || "") === "firebase-agent" || /windows|pc/i.test(String(device.platform || device.os || ""));
+  const pc = !isAndroidDevice(device) && (String(device.connectionMode || "") === "firebase-agent" || /windows|pc/i.test(String(device.platform || device.os || "")));
   const chosen = state.selectedDeviceId === device.id;
   return `
     <article class="card device-card">
@@ -254,8 +253,6 @@ function renderDeviceCard(device, showActions = true) {
 }
 
 function renderHome() {
-  const target = currentDevice();
-  const online = !!target && isOnline(target) && target.connectionMode === 'firebase-agent';
   return '<section class="hero-brand android-home-brand">' +
     '<img src="./mynassistant-logo.webp" alt="MynAssistant">' +
     '<div><h1>MynAssistant</h1><p>Kişisel asistanın için yeni başlangıç.</p></div></section>' +
@@ -264,8 +261,7 @@ function renderHome() {
     '<h2>Sana nasıl yardımcı olabilirim?</h2>' +
     '<p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p>' +
     '</section>' +
-    (state.user ? '<div class="home-presence-row"><span class="pill ' + (online ? 'success' : 'warning') + '"><span class="status-dot ' + (online ? 'online' : '') + '"></span>' + (online ? 'Windows bilgisayar çevrimiçi' : 'Cihaz bekleniyor') + '</span><button class="link-button" data-page="devices">Cihazlarım</button></div>' : '') +
-    (state.feedback ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : '');
+    (state.feedback ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : "");
 }
 
 function renderAuth() {
@@ -814,6 +810,8 @@ function subscribeProfile() {
   if (!state.user) return;
   state.profileUnsubscribe = onSnapshot(doc(db,"users",state.user.uid), snap => {
     state.profile = snap.exists() ? snap.data() : {};
+    const activeTag = document.activeElement?.tagName;
+    if (state.page === "account" && !["INPUT","TEXTAREA","SELECT"].includes(activeTag)) render();
   }, error => logIssue("MYN-WEB-PROFILE-001","Profil", "Profil bilgisi okunamadı.",error?.code || ""));
 }
 
@@ -1371,11 +1369,6 @@ document.addEventListener("click", async event => {
     else if (action === "select-android-device") { state.selectedAndroidDeviceId=button.dataset.id; state.commandTargetId="ANDROID"; storageSet("myn-selected-android-device",button.dataset.id); storageSet("myn-command-target","ANDROID"); showToast("Android cihaz komut hedefi olarak seçildi."); render(); }
     else if (action === "toggle-remote-touchpad") { state.remoteTouchpadEnabled=!state.remoteTouchpadEnabled; storageSet("myn-remote-touchpad",state.remoteTouchpadEnabled); render(); }
     else if (action === "toggle-remote-keyboard") { state.remoteKeyboardEnabled=!state.remoteKeyboardEnabled; storageSet("myn-remote-keyboard",state.remoteKeyboardEnabled); render(); }
-    else if (action === "choose-profile-photo") { document.getElementById("profile-photo-input")?.click(); }
-    else if (action === "toggle-phone-form") { state.phoneEditOpen=!state.phoneEditOpen; render(); }
-    else if (action === "link-google") { await linkGoogleAccount(); }
-    else if (action === "scan-desktop-qr") { await startDesktopQrScan(); }
-    else if (action === "stop-desktop-qr") { stopDesktopQrScan(); render(); }
     else if (action === "approve-desktop-pairing") { await approveDesktopPairing(); }
     else if (action === "toggle-theme") { setTheme(state.theme==="dark"?"light":"dark"); render(); }
     else if (action === "toggle-auth") { state.authMode=state.authMode==="register"?"login":"register"; state.feedback=""; render(); }
@@ -1444,10 +1437,6 @@ document.addEventListener("submit", async event => {
     event.preventDefault();
     state.pairingCode=String(new FormData(event.target).get("code") || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
     await approveDesktopPairing();
-  } else if (event.target.id==="desktop-pairing-form") {
-    event.preventDefault();
-    state.pairingCode=String(new FormData(event.target).get("code") || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
-    await approveDesktopPairing();
   } else if (event.target.id==="phone-form") {
     event.preventDefault();
     try { await savePendingPhoneNumber(new FormData(event.target).get("phone")); }
@@ -1479,10 +1468,6 @@ document.addEventListener("change", async event => {
     state.filesDeviceId=el.value; state.fileListing=null; render();
   } else if (el.id==="command-target") {
     state.commandTargetId=el.value;
-  } else if (el.id==="profile-photo-input") {
-    const file=el.files?.[0]; if (!file) return;
-    await uploadProfilePhoto(file);
-    el.value="";
   } else if (el.id==="profile-photo-input") {
     const file=el.files?.[0]; if (!file) return;
     await uploadProfilePhoto(file); el.value="";
