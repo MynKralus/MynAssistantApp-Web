@@ -257,7 +257,7 @@ function renderHome() {
     '<div class="home-logo-motion-stage" data-state="' + (state.speechBusy ? "listening" : "idle") + '" aria-label="Katmanlı MynAssistant logosu">' +
       '<div class="home-logo-halo" aria-hidden="true"></div>' +
       '<img class="home-logo-ribbons" src="./assets/mynassistant-ribbons-layer.webp?v=motion-v3" alt="" aria-hidden="true" fetchpriority="high">' +
-      '<img class="home-logo-center" src="./mynassistant-logo.webp?v=motion-v3" alt="MynAssistant merkez logosu" fetchpriority="high">' +
+      '<img class="home-logo-center" src="./assets/mynassistant-center-medallion.webp?v=motion-v4" alt="MynAssistant merkez madalyonu" fetchpriority="high">' +
     '</div>' +
     '<div class="home-command-copy"><div class="eyebrow">KOMUT MERKEZİ</div>' +
       '<h1>Sana nasıl yardımcı olabilirim?</h1>' +
@@ -1531,7 +1531,9 @@ startApp().catch(error => {
   appRoot.innerHTML = '<section class="card"><h2>MynAssistant başlatılamadı</h2><p>Sayfayı yenileyip tekrar dene. Sorun sürerse Hata kayıtları bölümünü kontrol et.</p></section>';
 });
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("./service-worker.js").catch(error => {
-    logIssue("MYN-WEB-PWA-001", "Çevrimdışı uygulama", "Uygulama kabuğu kaydedilemedi.", error?.message || "");
-  });
+  navigator.serviceWorker.register("./service-worker.js", { updateViaCache: "none" })
+    .then(registration => registration.update().catch(() => {}))
+    .catch(error => {
+      logIssue("MYN-WEB-PWA-001", "Çevrimdışı uygulama", "Uygulama kabuğu kaydedilemedi.", error?.message || "");
+    });
 }

@@ -794,7 +794,6 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   height: 100%;
   display: block;
   object-fit: contain;
-  clip-path: circle(14.3% at 50.46% 50.28%);
   transform-origin: 50.46% 50.28%;
   animation: myn-center-breathe 2s ease-in-out infinite;
   backface-visibility: hidden;
