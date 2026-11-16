@@ -326,15 +326,26 @@ function renderAccount() {
 
 function renderDevices() {
   if (!state.user) return `${renderHeading("Cihazlarım","Cihazlarını görmek için hesabına giriş yap.")}<section class="card"><button class="button full" data-page="auth">Giriş yap / Kayıt ol</button></section>`;
-  const list = pcDevices();
-  return `
-    ${renderHeading("Cihazlarım","Yalnızca bu MynAssistant hesabına ait cihazlar görünür.")}
-    <section class="row between"><span class="muted small">${list.length} Windows cihazı</span><button class="button secondary small-button" data-action="refresh-devices">${icon("refresh")} Yenile</button></section>
+  const pcs = pcDevices();
+  const androids = androidDevices();
+  const androidCard = device => {
+    const online = isOnline(device);
+    const selected = state.commandTargetId === "ANDROID" && state.selectedAndroidDeviceId === device.id;
+    return `<article class="card device-card">
+      <div class="device-top"><div class="device-icon">${icon("devices")}</div><div class="device-info"><strong>${esc(deviceDisplayName(device))}</strong><span>Android • ${esc(device.connectionMode || "MynAssistant")}</span></div><span class="pill ${online ? "success" : "warning"}"><span class="status-dot ${online ? "online" : ""}"></span>${online ? "Çevrimiçi" : "Çevrimdışı"}</span></div>
+      <div class="row between wrap"><span class="muted small">Son bağlantı: ${esc(fmtDate(device.lastSeenAt))}</span>${selected ? '<span class="pill success">Seçili hedef</span>' : ""}</div>
+      <button class="button secondary full" data-action="select-android-device" data-id="${esc(device.id)}" ${online ? "" : "disabled"}>Komut hedefi olarak seç</button>
+      </article>`;
+  };
+  return `${renderHeading("Cihazlarım","Bu MynAssistant hesabına bağlı Windows ve Android cihazları.")}
+    <section class="row between"><span class="muted small">${pcs.length} Windows • ${androids.length} Android cihazı</span><button class="button secondary small-button" data-action="refresh-devices">${icon("refresh")} Yenile</button></section>
     ${state.devicesLoading ? '<div class="progress"><span></span></div>' : ""}
     ${state.devicesError ? `<div class="notice danger">${esc(state.devicesError)}</div>` : ""}
-    ${list.length ? list.map(d=>renderDeviceCard(d)).join("") : `<div class="empty-state"><div class="empty-icon">${icon("monitor")}</div><strong>Henüz bilgisayar bağlanmamış</strong><p>Windows MynAssistant uygulamasını açıp bu hesapla giriş yaptığında bilgisayarın burada otomatik görünür.</p></div>`}
-    ${state.devices.filter(d=>!list.includes(d)).length ? `<section class="section-stack"><h3>Diğer cihazlar</h3>${state.devices.filter(d=>!list.includes(d)).map(d=>renderDeviceCard(d)).join("")}</section>` : ""}
-  `;
+    <section class="device-group"><div class="section-heading"><h2>Windows cihazları</h2><span class="pill">${pcs.length}</span></div>
+      ${pcs.length ? pcs.map(d=>renderDeviceCard(d)).join("") : '<div class="empty-state"><div class="empty-icon">' + icon("monitor") + '</div><strong>Henüz bilgisayar bağlanmamış</strong><p>Windows MynAssistant uygulamasında bu Google/Firebase hesabıyla oturum açtığında bilgisayarın burada görünür.</p></div>'}</section>
+    <section class="device-group"><div class="section-heading"><h2>Android cihazları</h2><span class="pill">${androids.length}</span></div>
+      ${androids.length ? androids.map(androidCard).join("") : '<div class="empty-state"><div class="empty-icon">' + icon("devices") + '</div><strong>Kayıtlı başka Android cihazı yok</strong><p>Android MynAssistant uygulamasında aynı hesapla oturum açan cihazlar burada görünür. Bu web tarayıcısı kendi Android kurulum kimliği yerine ayrı bir web oturumudur.</p></div>'}</section>
+    <div class="notice">Cihaz listesi Firestore ownerId alanı ile yalnızca oturum açan kullanıcıya göre filtrelenir. Çevrimiçi durumu son 3 dakikadaki heartbeat ile belirlenir.</div>`;
 }
 
 function renderRemoteScreenContent(device) {
@@ -347,54 +358,34 @@ function renderRemoteScreenContent(device) {
 }
 function renderRemote() {
   const device = currentDevice();
-  const online = device && isOnline(device) && device.connectionMode === "firebase-agent";
-  const hasFrame = !!device?.screenJpegBase64;
-  return `
-    <div class="section-heading"><h1 style="font-size:22px;margin:0">PC Kumandası</h1><div class="row">
-      <button class="icon-button" title="Ekran önizlemesi" data-action="toggle-screen">${icon("monitor")}</button>
-      <button class="icon-button" title="Klavye" data-action="focus-remote-keyboard">${icon("keyboard")}</button>
-    </div></div>
-    ${!state.user ? `
-      <div class="notice">
-        <strong>Yerel kullanım ile bulut bağlantısı farklıdır.</strong><br>
-        Bu ekranı ve kumanda düzenini oturum açmadan görüntüleyebilirsin. Kendi Windows cihazını internet üzerinden güvenli biçimde bulmak ve komut göndermek için MynAssistant hesabın gerekir; cihaz ve komut kayıtları Firebase'de hesap UID'siyle eşleştirilir.
-        <div style="margin-top:10px"><button class="button secondary small-button" data-page="auth">Bulut cihazını bağlamak için giriş yap</button></div>
-      </div>` : ""}
-    <section class="card compact">
-      <div class="row"><div class="device-icon">${icon("monitor")}</div><div class="device-info"><strong>${esc(device?.name || "Windows bilgisayar")}</strong><span>${online ? "Çevrimiçi • son heartbeat güncel" : "Çevrimdışı • Windows Agent bekleniyor"}</span></div><span class="status-dot ${online ? "online" : ""}"></span></div>
-      <div class="row wrap" style="margin-top:12px">
-        <label class="muted tiny" for="remote-device">Kontrol edilecek cihaz</label>
-        <select class="select" id="remote-device" style="flex:1;min-width:170px">
-          ${pcDevices().length ? pcDevices().map(d=>`<option value="${esc(d.id)}" ${device?.id===d.id?"selected":""}>${esc(d.name || "Windows bilgisayar")} • ${isOnline(d)?"Çevrimiçi":"Çevrimdışı"}</option>`).join("") : '<option value="">Giriş yaptığında bağlı Windows bilgisayarın burada görünür</option>'}
-        </select>
-      </div>
+  const online = !!device && isOnline(device) && device.connectionMode === "firebase-agent";
+  const controlsEnabled = online && !!state.user && !state.busy;
+  const buttons = [
+    ["lock_pc","Kilitle","key",false],
+    ["close_app","Uygulamayı kapat","close",false],
+    ["mute","Sesi kapat","mute",true],
+    ["volume_up","Sesi artır","volume",true],
+    ["home","Ana sayfa","home",true],
+    ["volume_down","Sesi kıs","volume",true]
+  ];
+  const remoteButton = ([command,label,ic,supported]) => `<button class="remote-control" data-command="${command}" ${controlsEnabled && supported ? "" : "disabled"} title="${supported ? label : "Bu Windows Agent sürümünde desteklenmiyor"}">${icon(ic)}<span>${label}</span>${!supported ? '<small class="remote-unsupported">Agent desteği yok</small>' : ""}</button>`;
+  return `${renderHeading("PC Kumandası","Windows bilgisayarını uzaktan yönet.")}
+    <div class="remote-toolbar">
+      <button class="remote-tool ${state.remoteScreenEnabled ? "active" : ""}" data-action="toggle-screen" aria-pressed="${state.remoteScreenEnabled}" title="Ekran önizlemesi">${icon("monitor")}</button>
+      <button class="remote-tool ${state.remoteTouchpadEnabled ? "active" : ""}" data-action="toggle-remote-touchpad" aria-pressed="${state.remoteTouchpadEnabled}" title="Touchpad">${icon("devices")}</button>
+      <button class="remote-tool ${state.remoteKeyboardEnabled ? "active" : ""}" data-action="toggle-remote-keyboard" aria-pressed="${state.remoteKeyboardEnabled}" title="Klavye">${icon("keyboard")}</button>
+    </div>
+    ${!state.user ? '<div class="notice">PC Kumandası arayüzünü görüntüleyebilirsin. Bulut üzerinden kendi Windows cihazını seçmek ve komut göndermek için MynAssistant hesabında oturum aç.</div>' : ""}
+    <section class="card compact remote-device-card">
+      <div class="row"><div class="device-icon">${icon("monitor")}</div><div class="device-info"><strong>${esc(deviceDisplayName(device) || "Windows bilgisayar")}</strong><span>${online ? "Windows • Çevrimiçi" : "Bu hesaba bağlı bilgisayar bekleniyor veya çevrimdışı"}</span></div><span class="status-dot ${online ? "online" : ""}"></span></div>
+      <div class="form-actions" style="margin-top:12px"><button class="button secondary full" data-page="devices">Cihaz listesine dön</button></div>
     </section>
     ${state.remoteScreenEnabled ? `<section class="section-stack"><div class="section-heading"><h3>Windows masaüstü</h3><span class="muted tiny">Sayfa açıkken güncellenir</span></div><div id="remote-screen-content">${renderRemoteScreenContent(device)}</div></section>` : ""}
-    <section class="card">
-      <div class="eyebrow">PC KUMANDASI</div>
-      <div class="remote-grid">
-        <button class="remote-control" data-command="mute" ${online?"":"disabled"}>${icon("mute")}Sesi kapat / aç</button>
-        <button class="remote-control" data-command="volume_up" ${online?"":"disabled"}>${icon("volume")}Sesi artır</button>
-        <button class="remote-control" data-command="volume_down" ${online?"":"disabled"}>${icon("volume")}Sesi kıs</button>
-        <button class="remote-control" data-command="home" ${online?"":"disabled"}>${icon("home")}Masaüstünü göster</button>
-      </div>
-      <p class="muted tiny" style="margin-top:12px">Bilgisayarın kilitlenmesi ve uygulama kapatma komutları mevcut Windows Agent sürümünde etkin değil, bu nedenle gönderilmiyor.</p>
-    </section>
-    <section class="section-stack">
-      <div class="section-heading"><h3>Touchpad</h3><span class="muted tiny">Sürükle: hareket • Dokun: sol tık • Basılı tut: sağ tık</span></div>
-      <div class="touchpad" id="touchpad" aria-label="Bilgisayar dokunmatik yüzeyi"><span class="touchpad-label">Touchpad</span></div>
-    </section>
-    <section class="card compact">
-      <h3>Klavye</h3>
-      <div class="row" style="margin-top:12px">
-        <input class="input" id="remote-keyboard-input" maxlength="1000" placeholder="Bilgisayara yaz…" ${online?"":"disabled"}>
-        <button class="icon-button" data-action="remote-backspace" title="Backspace" ${online?"":"disabled"}>${icon("close")}</button>
-        <button class="button" data-action="remote-type-enter" ${online?"":"disabled"}>Enter</button>
-      </div>
-      <p class="muted tiny">Metin, Windows bilgisayarında seçili alana yazılır. En fazla 1.000 karakter.</p>
-    </section>
-    ${!online ? '<div class="notice warning">Uzaktan kontrol için Windows Agent açık olmalı, aynı Firebase hesabıyla giriş yapmalı ve son 3 dakika içinde heartbeat göndermiş olmalı.</div>' : ""}
-  `;
+    <section class="section-stack"><h3 class="remote-section-title">PC KUMANDASI</h3><div class="card remote-grid-card"><div class="remote-grid">${buttons.map(remoteButton).join("")}</div></div></section>
+    ${!state.remoteTouchpadEnabled ? "" : `<section class="section-stack"><div class="section-heading"><h3>Touchpad</h3><span class="muted tiny">Sürükle: hareket • Dokun: sol tık • Basılı tut: sağ tık</span></div><div class="touchpad ${online ? "" : "disabled"}" id="touchpad" aria-label="Bilgisayar touchpad alanı"><span class="touchpad-label">Touchpad</span>${!online ? '<span class="touchpad-offline">Windows bilgisayar bekleniyor</span>' : ""}</div></section>`}
+    ${!state.remoteKeyboardEnabled ? "" : `<section class="card compact"><h3>Klavye</h3><div class="remote-keyboard-row" style="margin-top:12px"><input class="input" id="remote-keyboard-input" maxlength="1000" placeholder="Bilgisayara yaz…" ${controlsEnabled ? "" : "disabled"}><button class="icon-button" data-action="remote-backspace" title="Backspace" ${controlsEnabled ? "" : "disabled"}>${icon("close")}</button><button class="button" data-action="remote-type-enter" ${controlsEnabled ? "" : "disabled"}>Enter</button></div><p class="muted tiny">Metin Windows bilgisayarında seçili alana yazılır. En fazla 1.000 karakter.</p></section>`}
+    ${!online ? '<div class="notice warning">Windows Agent çevrimiçi olduğunda kumanda etkinleşir. Aynı Firebase hesabı kullanılmalı ve son 3 dakika içinde heartbeat gelmelidir.</div>' : ""}
+    <div class="notice">Not: Kilitle ve Uygulamayı kapat düğmeleri Android kumanda düzeniyle eşleştirildi; bu Windows Agent sürümünde karşılık gelen komutlar desteklenmediği için güvenlik amacıyla devre dışıdır.</div>`;
 }
 
 function renderFiles() {
@@ -510,18 +501,18 @@ function renderDiagnostics() {
 function renderComposer() {
   if (state.page !== "home") return "";
   const pc = currentDevice();
-  const android = androidDevices().find(device => device.id === state.selectedAndroidDeviceId);
+  const selectedAndroid = androidDevices().find(device => device.id === state.selectedAndroidDeviceId);
   const targetDescription = state.commandTargetId === "PC" ? (pc ? deviceDisplayName(pc) : "Windows bilgisayar bekleniyor") :
     state.commandTargetId === "ANDROID" ? (selectedAndroid ? deviceDisplayName(selectedAndroid) : "Android cihaz seçilmedi") :
     state.commandTargetId === "PHONE" ? "Bu telefon (Android)" : "Komuta göre telefon veya kullanılabilir bilgisayar";
   return '<div class="composer-wrap"><form class="composer android-composer" id="command-form">' +
     '<div class="composer-top"><button type="button" class="composer-target" data-action="open-target-picker">' + icon("plus") + '<span>' + esc(commandTargetLabel()) + '</span><span class="target-chevron">⌄</span></button><span class="muted tiny composer-target-description">' + esc(targetDescription) + '</span></div>' +
-    '<div class="composer-input-row"><input class="composer-input" id="command-input" maxlength="1000" autocomplete="off" placeholder="Komut yaz…" value="' + esc(state.commandText) + '" ' + (state.busy ? 'disabled' : '') + '>' +
-    '<button type="button" class="round-action" data-action="speech-start" title="Sesli komut" ' + (("SpeechRecognition" in window || "webkitSpeechRecognition" in window) ? '' : 'disabled') + '>' + icon("mic") + '</button>' +
-    '<button type="submit" class="round-action primary" aria-label="Komutu gönder" ' + (state.busy ? 'disabled' : '') + '>' + icon("send") + '</button></div>' +
+    '<div class="composer-input-row"><input class="composer-input" id="command-input" maxlength="1000" autocomplete="off" placeholder="Komut yaz…" value="' + esc(state.commandText) + '" ' + (state.busy ? "disabled" : "") + '>' +
+    '<button type="button" class="round-action" data-action="speech-start" title="Sesli komut" ' + (("SpeechRecognition" in window || "webkitSpeechRecognition" in window) ? "" : "disabled") + '>' + icon("mic") + '</button>' +
+    '<button type="submit" class="round-action primary" aria-label="Komutu gönder" ' + (state.busy ? "disabled" : "") + '>' + icon("send") + '</button></div>' +
     '</form>' +
-    (!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Bulut cihazlarına komut göndermek için MynAssistant hesabına giriş yap.</p>' : '') +
-    (state.feedback ? '<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">' + esc(state.feedback) + '</p>' : '') +
+    (!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Bulut cihazlarına komut göndermek için MynAssistant hesabına giriş yap.</p>' : "") +
+    (state.feedback ? '<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">' + esc(state.feedback) + '</p>' : "") +
     '</div>';
 }
 
