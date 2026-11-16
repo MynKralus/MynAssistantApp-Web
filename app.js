@@ -301,29 +301,38 @@ function renderAuth() {
 function renderAccount() {
   if (!state.user) return renderAuth();
   const u = state.user;
+  const googleLinked = !!u.providerData?.some(provider => provider.providerId === "google.com");
+  const phone = u.phoneNumber || state.profile?.phoneNumber || "";
+  const pendingPhone = state.profile?.pendingPhoneNumber || "";
+  const phoneStatus = phone ? "Doğrulandı · " + phone : pendingPhone ? "Doğrulanmadı · " + pendingPhone : "Henüz belirtilmemiş";
   return `
-    ${renderHeading("Hesabım", "MynAssistant profil bilgilerin.")}
-    <section class="card">
-      <div class="row" style="margin-bottom:18px">
-        ${u.photoURL ? `<img class="avatar" src="${esc(u.photoURL)}" alt="Profil fotoğrafı">` : '<img class="avatar" src="./mynassistant-logo.webp" alt="MynAssistant logosu">'}
-        <div class="device-info"><strong>${esc(u.displayName || u.email?.split("@")[0] || "MynAssistant kullanıcısı")}</strong><span>${esc(u.email || "")}</span></div>
-        <span class="pill ${u.emailVerified ? "success" : "warning"}">${u.emailVerified ? "E-posta doğrulandı" : "E-posta bekliyor"}</span>
+    ${renderHeading("Hesabım","MynAssistant profil bilgilerin.")}
+    <section class="card account-profile-card">
+      <div class="account-profile-head">
+        <img class="account-profile-photo" src="${esc(u.photoURL || "./mynassistant-logo.webp")}" alt="Profil fotoğrafı">
+        <div class="account-profile-identity"><strong>${esc(u.displayName || u.email?.split("@")[0] || "MynAssistant kullanıcısı")}</strong><span>${esc(u.email || "")}</span>
+        <button class="button ghost small-button" type="button" data-action="choose-profile-photo" ${state.profilePhotoBusy ? "disabled" : ""}>${icon("upload")} ${state.profilePhotoBusy ? "Fotoğraf yükleniyor…" : "Fotoğraf yükle"}</button></div>
       </div>
-      <form id="profile-form" class="form-stack">
-        <div class="field"><label for="profile-name">Görünen ad</label><input class="input" id="profile-name" name="name" maxlength="80" value="${esc(u.displayName || "")}"></div>
-        <div class="field"><label>E-posta adresi</label><input class="input" value="${esc(u.email || "")}" disabled></div>
-        <div class="field"><label for="profile-email">Yeni e-posta adresi</label><input class="input" id="profile-email" name="email" type="email" maxlength="254" placeholder="yeni@ornek.com"></div>
-        <div class="form-actions"><button class="button" type="submit">Profil bilgilerini kaydet</button><button class="button secondary" type="button" data-action="verify-email" ${u.emailVerified ? "disabled" : ""}>Doğrulama e-postası gönder</button></div>
+      <input type="file" id="profile-photo-input" accept="image/jpeg,image/png,image/webp" hidden>
+      <form id="profile-form" class="form-stack account-form">
+        <div class="field"><label for="profile-name">Kullanıcı adı</label><input class="input" id="profile-name" name="name" maxlength="80" value="${esc(u.displayName || "")}" required></div>
+        <div class="account-divider"></div>
+        <div class="account-status-row"><div class="account-status-copy"><strong>E-posta doğrulaması</strong><span>${u.emailVerified ? "E-posta adresi doğrulandı" : "E-posta adresi henüz doğrulanmadı"}</span></div><span class="pill ${u.emailVerified ? "success" : "warning"}">${u.emailVerified ? icon("check") : "Bekliyor"}</span></div>
+        ${!u.emailVerified ? '<button class="button ghost full" type="button" data-action="verify-email">Doğrulama e-postası gönder</button>' : ""}
+        <div class="field"><label for="profile-email">E-posta adresini değiştir</label><input class="input" id="profile-email" name="email" type="email" maxlength="254" placeholder="yeni@ornek.com"></div>
+        <button class="button secondary full" type="submit" ${state.profileBusy ? "disabled" : ""}>${state.profileBusy ? "Kaydediliyor…" : "Profil bilgilerini kaydet"}</button>
       </form>
-      ${state.profileMessage ? `<p class="muted small" role="status">${esc(state.profileMessage)}</p>` : ""}
-    </section>
-    <section class="card compact">
-      <h3>Hesap bağlantısı</h3><p>Android MynAssistant ile Windows Agent aynı Google/Firebase UID'sini kullanır. Aynı e-posta ile giriş yaptığında cihazlar otomatik görünür.</p>
-      <div class="form-actions" style="margin-top:14px"><button class="button secondary" data-page="devices">Cihazlarımı gör</button><button class="button danger" data-action="logout">Çıkış yap</button></div>
-    </section>
-    <div class="notice warning">Profil fotoğrafı yükleme ve SMS doğrulama Android sürümünde yapılandırılmış sağlayıcı gerektiriyor. Web sürümünde henüz etkin değil; burada çalışıyor gibi gösterilmez.</div>`;
+      <div class="account-divider"></div>
+      <div class="account-status-row"><div class="account-status-copy"><strong>Google hesabı</strong><span>${googleLinked ? "Bağlandı" : "Bu hesaba Google sağlayıcısı bağlanmadı"}</span></div><span class="pill ${googleLinked ? "success" : "warning"}">${googleLinked ? icon("check") : "Bağlı değil"}</span></div>
+      ${!googleLinked ? '<button class="button ghost full" type="button" data-action="link-google">Google hesabını bağla</button>' : ""}
+      <div class="account-divider"></div>
+      <div class="account-status-row"><div class="account-status-copy"><strong>Telefon numarası</strong><span class="${phone ? "text-success" : "text-warning"}">${esc(phoneStatus)}</span></div><button class="button ghost small-button" type="button" data-action="toggle-phone-form">${state.phoneEditOpen ? "Kapat" : phone || pendingPhone ? "Düzenle" : "Ekle"}</button></div>
+      ${state.phoneEditOpen ? `<form id="phone-form" class="form-stack"><div class="field"><label for="profile-phone">Telefon numarası</label><input class="input" id="profile-phone" name="phone" inputmode="tel" autocomplete="tel" maxlength="22" placeholder="+90 5XX XXX XX XX" value="${esc(pendingPhone || phone)}" required></div><button class="button secondary full" type="submit">Telefon numarasını kaydet</button><p class="muted tiny">Android uygulamasındaki ücretsiz hesap modunda gerçek SMS gönderimi kapalıdır. Web sürümü de numarayı bekleyen/doğrulanmamış olarak saklar; SMS doğrulaması yapılmış gibi göstermez.</p></form>` : ""}
+      ${state.profileMessage ? `<p class="pairing-status" role="status">${esc(state.profileMessage)}</p>` : ""}
+      <div class="account-divider"></div>
+      <button class="button ghost full" type="button" data-action="logout">Çıkış yap</button>
+    </section>`;
 }
-
 function renderDevices() {
   if (!state.user) return `${renderHeading("Cihazlarım","Cihazlarını görmek için hesabına giriş yap.")}<section class="card"><button class="button full" data-page="auth">Giriş yap / Kayıt ol</button></section>`;
   const pcs = pcDevices();
