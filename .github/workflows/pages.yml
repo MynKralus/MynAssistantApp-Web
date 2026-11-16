@@ -86,7 +86,7 @@ jobs:
           ):
               path = Path("assets") / name
               with Image.open(path) as image:
-                  if image.format != "WEBP" or image.size != (384, 384) or image.mode != "RGBA":
+                  if image.format != "WEBP" or image.size != (128, 128) or image.mode != "RGBA":
                       raise SystemExit(f"Invalid separated ribbon image: {name}")
                   alpha = image.getchannel("A")
                   if alpha.getextrema()[0] != 0 or alpha.getextrema()[1] == 0:
