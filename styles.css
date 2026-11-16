@@ -390,3 +390,350 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   .hero-avatar-shell { width: 158px; border-radius: 38px; }
   .hero-avatar { border-radius: 30px; }
 }
+
+
+/* Android MynAssistant layout parity */
+.myn-toolbar {
+  height: 74px;
+  padding-inline: max(18px, calc((100vw - 1080px)/2));
+  gap: 13px;
+  border-bottom-color: rgba(210,220,255,.07);
+}
+.toolbar-menu { width: 48px; height: 48px; color: var(--text); }
+.toolbar-menu svg { width: 28px; height: 28px; }
+.toolbar-remote {
+  width: 42px;
+  height: 46px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  border-radius: 14px;
+}
+.toolbar-remote svg { width: 26px; height: 26px; }
+.header-online-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-right: 3px;
+}
+.header-online-dot.online { background: var(--success); box-shadow: 0 0 0 4px rgba(89,201,139,.12); }
+.theme-pill {
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #11162a;
+  background: var(--accent);
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.theme-pill svg { width: 19px; height: 19px; }
+.light-theme .theme-pill { background: #20283a; color: #f4f6ff; }
+.android-home-brand {
+  align-items: center;
+  gap: 15px;
+  padding: 4px 0 0;
+}
+.android-home-brand img {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
+  border-radius: 14px;
+  object-fit: cover;
+}
+.android-home-brand h1 {
+  margin: 0;
+  font-size: clamp(27px, 6vw, 34px);
+  font-weight: 650;
+  letter-spacing: -.9px;
+  line-height: 1.12;
+}
+.android-home-brand p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.android-command-card {
+  padding: 26px 24px;
+  border: 0;
+  border-radius: 26px;
+  background: #343338;
+  box-shadow: none;
+}
+.android-command-card .eyebrow {
+  margin-bottom: 34px;
+  font-size: 13px;
+  letter-spacing: .7px;
+  color: var(--mint);
+}
+.android-command-card h2 {
+  font-size: clamp(23px, 5vw, 28px);
+  line-height: 1.12;
+  letter-spacing: -.5px;
+  max-width: 470px;
+}
+.android-command-card p {
+  margin-top: 25px;
+  max-width: 580px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: #c1c0c8;
+}
+.home-presence-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: -5px;
+}
+.home-feedback { color: var(--muted); font-size: 12px; margin: 0; }
+.android-composer {
+  min-height: 76px;
+  border-radius: 34px;
+  padding: 10px 12px;
+  gap: 5px;
+  background: #343338;
+  border: 1px solid rgba(255,255,255,.06);
+  box-shadow: none;
+}
+.composer-wrap {
+  width: min(100%, 820px);
+  padding: 0 20px calc(14px + var(--safe-bottom));
+  background: linear-gradient(to bottom, transparent, var(--bg) 14%);
+}
+.android-composer .composer-top { min-height: 27px; }
+.android-composer .composer-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: min(64vw, 260px);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+.android-composer .composer-target svg { width: 18px; height: 18px; }
+.android-composer .target-chevron { font-size: 17px; margin-left: 2px; }
+.android-composer .composer-target-description { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.android-composer .composer-input-row { gap: 8px; }
+.android-composer .composer-input {
+  min-height: 48px;
+  padding: 8px 12px;
+  font-size: 16px;
+}
+.android-composer .round-action {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex: 0 0 48px;
+}
+.android-composer .round-action svg { width: 22px; height: 22px; }
+.drawer-account-android { padding-top: 18px; padding-bottom: 18px; }
+.account-chevron {
+  border: 0; background: transparent; color: var(--accent);
+  min-width: 34px; min-height: 34px; font-size: 16px; cursor: pointer;
+}
+.account-switcher {
+  padding: 13px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel-2);
+  margin: 0 0 12px;
+}
+.account-switcher > p { color: var(--muted); font-size: 12px; margin: 0 0 10px; }
+.account-current { display: flex; align-items: center; gap: 10px; }
+.account-current > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.account-current strong { font-size: 13px; }
+.account-current span { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.small-avatar { width: 36px; height: 36px; border-radius: 9px; }
+.full-link { width: 100%; text-align: center; margin: 4px 0; }
+.target-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(14px, env(safe-area-inset-top)) 14px calc(14px + var(--safe-bottom));
+  background: rgba(0,0,0,.67);
+  backdrop-filter: blur(4px);
+}
+.target-modal {
+  width: min(100%, 600px);
+  max-height: min(88dvh, 850px);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 30px;
+  background: #29282f;
+  border: 1px solid rgba(255,255,255,.07);
+  box-shadow: 0 24px 80px rgba(0,0,0,.45);
+}
+.target-modal-head {
+  padding: 22px 22px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.target-modal-head h2 {
+  margin: 0;
+  font-size: clamp(23px, 5vw, 29px);
+  line-height: 1.22;
+  font-weight: 550;
+}
+.target-modal-scroll {
+  padding: 6px 22px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.target-modal-scroll h3 {
+  margin: 14px 0 7px;
+  padding-top: 9px;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--accent);
+}
+.target-option {
+  width: 100%;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.target-option:hover, .target-option.selected { background: rgba(139,156,255,.12); }
+.target-option-icon { width: 34px; flex: 0 0 34px; color: var(--muted); display: grid; place-items: center; }
+.target-option-icon svg { width: 25px; height: 25px; }
+.target-option-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.target-option-copy strong { font-size: 14px; font-weight: 520; overflow-wrap: anywhere; }
+.target-option-copy small { font-size: 11px; color: var(--muted); line-height: 1.4; }
+.target-check { width: 22px; color: var(--text); display: grid; place-items: center; }
+.target-check svg { width: 19px; height: 19px; }
+.target-empty {
+  padding: 12px 10px 16px 58px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.target-modal-footer {
+  padding: 10px 22px 20px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.target-modal-footer .button { background: transparent; color: var(--accent); border: 0; }
+.device-group { display: flex; flex-direction: column; gap: 10px; }
+.device-group .section-heading { margin-bottom: 2px; }
+.remote-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: -7px;
+}
+.remote-tool {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.remote-tool svg { width: 25px; height: 25px; }
+.remote-tool.active { color: var(--accent); background: rgba(139,156,255,.10); }
+.remote-device-card { margin-top: 2px; }
+.remote-section-title {
+  color: var(--mint);
+  font-size: 13px;
+  letter-spacing: .5px;
+  margin: 2px 0 0;
+}
+.remote-grid-card { padding: 12px; border-radius: 28px; }
+.remote-grid { gap: 9px; }
+.remote-control {
+  min-height: 96px;
+  border-radius: 22px;
+  background: #0e111a;
+  border: 0;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 12px 7px;
+}
+.remote-control svg { width: 27px; height: 27px; }
+.remote-control:disabled { opacity: .48; }
+.remote-unsupported { color: var(--warning); font-size: 9px; font-weight: 500; }
+.remote-keyboard-row { display: flex; align-items: center; gap: 8px; }
+.remote-keyboard-row .input { min-width: 0; flex: 1; }
+.touchpad.disabled { opacity: .65; }
+.touchpad-offline {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255,255,255,.78);
+  font-size: 12px;
+  pointer-events: none;
+}
+.account-profile-card { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.account-profile-head { display: flex; align-items: center; gap: 14px; }
+.account-profile-photo { width: 76px; height: 76px; flex: 0 0 76px; border-radius: 13px; object-fit: cover; background: var(--panel-3); }
+.account-profile-identity { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.account-profile-identity strong { font-size: 18px; font-weight: 650; line-height: 1.25; overflow-wrap: anywhere; }
+.account-profile-identity span { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.account-form { gap: 14px; }
+.account-divider { height: 1px; width: 100%; background: var(--border); margin: 2px 0; }
+.account-status-row { display: flex; align-items: center; gap: 12px; }
+.account-status-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 5px; }
+.account-status-copy strong { font-size: 16px; font-weight: 620; }
+.account-status-copy span { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.account-status-row .pill svg { width: 17px; height: 17px; }
+.pairing-status { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.pairing-camera-wrap {
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--panel-2);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pairing-camera-wrap video {
+  width: 100%;
+  max-height: 290px;
+  object-fit: cover;
+  background: #05070b;
+  border-radius: 13px;
+}
+.pairing-code-input { text-transform: uppercase; letter-spacing: 2px; font-family: ui-monospace, monospace; }
+@media (max-width: 600px) {
+  .myn-toolbar { height: 74px; padding-inline: 18px; }
+  .app-main { padding: 22px 20px 24px; gap: 20px; }
+  .android-home-brand img { width: 58px; height: 58px; flex-basis: 58px; }
+  .android-home-brand h1 { font-size: 29px; }
+  .android-command-card { padding: 25px 23px; }
+  .android-command-card .eyebrow { margin-bottom: 34px; }
+  .android-command-card p { margin-top: 25px; font-size: 15px; }
+  .composer-wrap { padding-inline: 20px; }
+  .target-modal { max-height: 88dvh; border-radius: 28px; }
+  .target-modal-head { padding: 22px 20px 8px; }
+  .target-modal-scroll { padding-inline: 20px; }
+  .account-profile-head { align-items: flex-start; }
+  .remote-control { min-height: 92px; }
+}
