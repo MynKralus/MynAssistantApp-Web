@@ -618,6 +618,23 @@ async function uploadProfilePhoto(file) {
   } finally { state.profilePhotoBusy = false; render(); }
 }
 
+function renderDesktopPairingCard() {
+  return `<section class="card pairing-card">
+    <div class="row"><div class="device-icon">${icon("monitor")}</div><div class="device-info"><strong>Windows bilgisayarını eşleştir</strong><span>Windows uygulamasındaki tek kullanımlık kodla</span></div></div>
+    <p>Windows uygulamasında gösterilen 10 karakterli eşleştirme kodunu gir veya QR kodunu tara. Kod 5 dakika içinde sona erer.</p>
+    <form id="desktop-pairing-form" class="form-stack" style="margin-top:14px">
+      <div class="field"><label for="desktop-pairing-code">Windows eşleştirme kodu</label><input class="input pairing-code-input" id="desktop-pairing-code" name="code" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="ABCDE23456" value="${esc(state.pairingCode)}" ${state.pairingBusy ? "disabled" : ""}></div>
+      <p class="muted tiny">Yalnızca kod girilir; telefon hesabının oturum anahtarları paylaşılmaz.</p>
+      <button class="button ghost full" type="button" data-action="scan-desktop-qr" ${state.pairingBusy || state.pairingScannerActive ? "disabled" : ""}>${icon("devices")} QR kodunu tara</button>
+      ${state.pairingScannerActive ? '<div class="pairing-camera-wrap"><video id="pairing-camera-video" autoplay playsinline muted></video><button class="button ghost full" type="button" data-action="stop-desktop-qr">Taramayı kapat</button></div>' : ""}
+      <button class="button full" type="submit" ${state.pairingBusy || !state.user ? "disabled" : ""}>${state.pairingBusy ? "Bilgisayar bağlanıyor…" : "Bilgisayarı bağla"}</button>
+    </form>
+    <p class="pairing-status" role="status">${esc(state.pairingStatus)}</p>
+    ${!state.user ? '<button class="button secondary full" data-page="auth">Giriş yap / Kayıt ol</button>' : ""}
+    <p class="muted tiny">Onay Firebase ID token ile yapılır. Yönetici paneli parolası ve sunucu servis anahtarları web tarayıcısına gönderilmez.</p>
+  </section>`;
+}
+
 function renderSettings() {
   const tab = state.settingsTab;
   let body = "";
@@ -629,31 +646,21 @@ function renderSettings() {
       <section class="card compact"><h3>Uygulama bilgileri</h3><p>MynAssistant Web ${APP_VERSION}</p><p class="muted tiny">Android uygulaması: 0.6.3 • Web ayrı bir istemci uygulamasıdır.</p></section>`;
   } else if (tab === "Agent") {
     const online = onlinePcDevices();
-    body = `
-      <section class="card">
-        <h3>Otomatik bilgisayar bağlantısı</h3>
-        <p>Windows MynAssistant uygulamasında bu hesapla oluşturulan cihaz kaydı Firestore üzerinden görünür.</p>
-        <div class="row between" style="margin-top:15px"><strong>Windows Agent durumu</strong><span class="pill ${online.length?"success":"warning"}">${online.length?"Çevrimiçi":"Bağlı cihaz bekleniyor"}</span></div>
-        <p>${online.length ? online.map(d=>esc(deviceDisplayName(d))).join(", ") : "Bu hesaba ait çevrimiçi Windows Agent bulunamadı."}</p>
-        <button class="button secondary full" data-page="devices" style="margin-top:12px">Cihazlarımı gör</button>
-        <button class="button ghost full" data-action="refresh-devices" style="margin-top:8px">Bağlantıyı yenile</button>
-      </section>
-      <section class="card">
-        <div class="row"><div class="device-icon">${icon("monitor")}</div><div class="device-info"><strong>Windows bilgisayarını eşleştir</strong><span>Windows uygulamasındaki tek kullanımlık kodla</span></div></div>
-        <p>Windows uygulamasında gösterilen 10 karakterli eşleştirme kodunu gir veya QR kodunu tara. Kod 5 dakika içinde sona erer.</p>
-        <form id="desktop-pairing-form" class="form-stack" style="margin-top:14px">
-          <div class="field"><label for="desktop-pairing-code">Windows eşleştirme kodu</label><input class="input pairing-code-input" id="desktop-pairing-code" name="code" maxlength="10" autocomplete="off" autocapitalize="characters" placeholder="ABCDE23456" value="${esc(state.pairingCode)}" ${state.pairingBusy ? "disabled" : ""}></div>
-          <p class="muted tiny">Yalnızca kod girilir; telefon hesabının oturum anahtarları paylaşılmaz.</p>
-          <button class="button secondary full" type="button" data-action="scan-desktop-qr" ${state.pairingBusy || state.pairingScannerActive ? "disabled" : ""}>${icon("devices")} QR kodunu tara</button>
-          ${state.pairingScannerActive ? '<div class="pairing-camera-wrap"><video id="pairing-camera-video" autoplay playsinline muted></video><button class="button ghost full" type="button" data-action="stop-desktop-qr">Taramayı kapat</button></div>' : ""}
-          <button class="button full" type="submit" ${state.pairingBusy || !state.user ? "disabled" : ""}>${state.pairingBusy ? "Bilgisayar bağlanıyor…" : "Bilgisayarı bağla"}</button>
-        </form>
-        <p class="pairing-status" role="status">${esc(state.pairingStatus)}</p>
-        ${!state.user ? '<button class="button secondary full" data-page="auth">Giriş yap / Kayıt ol</button>' : ""}
-      </section>
-      <section class="card"><h3>Bağlantı güvenliği</h3><p>Onay Firebase ID token ile yapılır. Yönetici paneli parolası ve sunucu servis anahtarları web tarayıcısına gönderilmez.</p></section>`;
+    body = `<section class="card">
+      <h3>Windows Agent</h3>
+      <p>Windows uygulamasındaki Agent hesabınla aynı Firebase UID üzerinden bağlanır. Son 3 dakika içinde heartbeat gönderen bilgisayarlar çevrimiçi görünür.</p>
+      <div class="row between" style="margin-top:15px"><strong>Bağlantı durumu</strong><span class="pill ${online.length?"success":"warning"}">${online.length?"Çevrimiçi":"Bilgisayar bekleniyor"}</span></div>
+      <p>${online.length ? online.map(d=>esc(deviceDisplayName(d))).join(", ") : "Bu hesaba ait çevrimiçi Windows Agent bulunamadı."}</p>
+      <button class="button secondary full" data-page="devices" style="margin-top:12px">Cihazlarımı gör</button>
+      <button class="button ghost full" data-action="refresh-devices" style="margin-top:8px">Bağlantıyı yenile</button>
+    </section>
+    <section class="card"><h3>Bağlantı çalışma biçimi</h3><p>Komutlar mevcut Firebase cihaz/komut kuyruğu üzerinden gönderilir. Yönetici API’si bu kullanıcı bağlantısının yerine geçmez.</p></section>`;
   } else if (tab === "Hesap") {
-    body = `<section class="card"><h3>Hesap ve profil</h3><p>${state.user ? "MynAssistant hesabın etkin." : "Şu anda giriş yapılmamış."}</p><button class="button full" data-page="${state.user?"account":"auth"}" style="margin-top:12px">${state.user?"Hesap ve profil ayarları":"Giriş yap / Kayıt ol"}</button></section>`;
+    body = `<section class="card">
+      <p class="muted small">Oturum bu cihazda hatırlanıyor.</p>
+      ${renderDesktopPairingCard()}
+      <button class="button ghost full" data-page="${state.user?"account":"auth"}">${icon("user")} Hesap ve profil ayarları</button>
+    </section>`;
   } else if (tab === "İzinler") {
     body = `
       <p class="muted small">İzin durumları tarayıcıda geçerlidir. Android'e ait sistem izinleri web sayfasından yönetilemez.</p>
