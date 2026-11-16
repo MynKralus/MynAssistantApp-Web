@@ -71,7 +71,28 @@ jobs:
           test -s mynassistant-icon-192.png
           test -s mynassistant-icon-512.png
           test -s assets/mynassistant-ribbons-layer.webp
+          test -s assets/mynassistant-ribbon-1.webp
+          test -s assets/mynassistant-ribbon-2.webp
+          test -s assets/mynassistant-ribbon-3.webp
           test -s assets/mynassistant-center-medallion.webp
+          python - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+
+          for name in (
+              "mynassistant-ribbon-1.webp",
+              "mynassistant-ribbon-2.webp",
+              "mynassistant-ribbon-3.webp",
+          ):
+              path = Path("assets") / name
+              with Image.open(path) as image:
+                  if image.format != "WEBP" or image.size != (384, 384) or image.mode != "RGBA":
+                      raise SystemExit(f"Invalid separated ribbon image: {name}")
+                  alpha = image.getchannel("A")
+                  if alpha.getextrema()[0] != 0 or alpha.getextrema()[1] == 0:
+                      raise SystemExit(f"Ribbon must retain transparent background: {name}")
+              print(f"Validated independent transparent layer: {name}")
+          PY
           python - <<'PY'
           from PIL import Image
           from pathlib import Path
@@ -96,9 +117,13 @@ jobs:
                   raise SystemExit("Independent ribbon layer must have a transparent background and visible pixels.")
           print("Validated transparent independent MynAssistant ribbon layer.")
           PY
-          grep -q 'home-logo-ribbons' app.js
+          grep -q 'home-logo-ribbon--one' app.js
+          grep -q 'home-logo-ribbon--two' app.js
+          grep -q 'home-logo-ribbon--three' app.js
           grep -q 'mynassistant-center-medallion.webp' app.js
-          grep -q 'myn-ribbons-revolve' styles.css
+          grep -q 'myn-ribbon-one-orbit' styles.css
+          grep -q 'myn-ribbon-two-orbit' styles.css
+          grep -q 'myn-ribbon-three-orbit' styles.css
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

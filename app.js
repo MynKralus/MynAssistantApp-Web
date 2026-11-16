@@ -256,8 +256,10 @@ function renderHome() {
   return '<section class="home-command-stage" aria-label="MynAssistant komut merkezi">' +
     '<div class="home-logo-motion-stage" data-state="' + (state.speechBusy ? "listening" : "idle") + '" aria-label="Katmanlı MynAssistant logosu">' +
       '<div class="home-logo-halo" aria-hidden="true"></div>' +
-      '<img class="home-logo-ribbons" src="./assets/mynassistant-ribbons-layer.webp?v=motion-v3" alt="" aria-hidden="true" fetchpriority="high">' +
-      '<img class="home-logo-center" src="./assets/mynassistant-center-medallion.webp?v=motion-v4" alt="MynAssistant merkez madalyonu" fetchpriority="high">' +
+      '<img class="home-logo-ribbon home-logo-ribbon--one" src="./assets/mynassistant-ribbon-1.webp?v=motion-v5" alt="" aria-hidden="true" fetchpriority="high">' +
+      '<img class="home-logo-ribbon home-logo-ribbon--two" src="./assets/mynassistant-ribbon-2.webp?v=motion-v5" alt="" aria-hidden="true" fetchpriority="high">' +
+      '<img class="home-logo-ribbon home-logo-ribbon--three" src="./assets/mynassistant-ribbon-3.webp?v=motion-v5" alt="" aria-hidden="true" fetchpriority="high">' +
+      '<img class="home-logo-center" src="./assets/mynassistant-center-medallion.webp?v=motion-v5" alt="MynAssistant merkez madalyonu" fetchpriority="high">' +
     '</div>' +
     '<div class="home-command-copy"><div class="eyebrow">KOMUT MERKEZİ</div>' +
       '<h1>Sana nasıl yardımcı olabilirim?</h1>' +

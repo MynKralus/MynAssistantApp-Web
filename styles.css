@@ -773,7 +773,7 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   filter: blur(14px);
   animation: myn-logo-halo 3.2s ease-in-out infinite alternate;
 }
-.home-logo-ribbons {
+.home-logo-ribbon {
   position: absolute;
   z-index: 1;
   inset: 0;
@@ -782,9 +782,17 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   display: block;
   object-fit: contain;
   transform-origin: 50.46% 50.28%;
-  animation: myn-ribbons-revolve 12s linear infinite;
   backface-visibility: hidden;
   will-change: transform;
+}
+.home-logo-ribbon--one {
+  animation: myn-ribbon-one-orbit 18s linear infinite;
+}
+.home-logo-ribbon--two {
+  animation: myn-ribbon-two-orbit 22s linear infinite;
+}
+.home-logo-ribbon--three {
+  animation: myn-ribbon-three-orbit 26s linear infinite;
 }
 .home-logo-center {
   position: absolute;
@@ -826,20 +834,37 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   font-size: clamp(14px, 3.8vw, 17px);
   line-height: 1.55;
 }
-@keyframes myn-ribbons-revolve {
+@keyframes myn-ribbon-one-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+@keyframes myn-ribbon-two-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes myn-ribbon-three-orbit {
   from { transform: rotate(0deg); }
   to { transform: rotate(-360deg); }
 }
 @keyframes myn-center-breathe {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.045); }
+  50% { transform: scale(1.035); }
 }
 .home-logo-motion-stage[data-state="listening"] .home-logo-center {
-  animation: myn-center-listen 3s ease-in-out infinite;
+  animation: myn-center-listen 2.8s ease-in-out infinite;
+}
+.home-logo-motion-stage[data-state="listening"] .home-logo-ribbon--one {
+  animation-duration: 15s;
+}
+.home-logo-motion-stage[data-state="listening"] .home-logo-ribbon--two {
+  animation-duration: 19s;
+}
+.home-logo-motion-stage[data-state="listening"] .home-logo-ribbon--three {
+  animation-duration: 23s;
 }
 @keyframes myn-center-listen {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.035); }
+  50% { transform: scale(1.05); }
 }
 @keyframes myn-logo-halo {
   from { opacity: .45; transform: scale(.94); }
@@ -854,6 +879,6 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   .home-logo-motion-stage { width: clamp(205px, 64vw, 270px); border-radius: 23px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-logo-ribbons, .home-logo-center, .home-logo-halo { animation: none !important; }
+  .home-logo-ribbon, .home-logo-center, .home-logo-halo { animation: none !important; }
 }
 
