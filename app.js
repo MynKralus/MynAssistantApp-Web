@@ -15,7 +15,7 @@ const APP_VERSION = "0.2.0-web";
 const MAX_TRANSFER_BYTES = 500_000;
 const COMMAND_TIMEOUT_MS = 90_000;
 const ONLINE_WINDOW_MS = 180_000;
-const SETTINGS_TABS = ["Genel", "Agent", "Hesap", "İzinler", "Eklentiler", "Başlangıç", "Hata günlükleri", "Kısayollar"];
+const SETTINGS_TABS = ["Genel", "Agent", "Hesap", "İzinler", "Eklentiler", "Başlangıç", "Hata günlükleri"];
 const NAV = [
   ["home", "Ana sayfa", "home"],
   ["account", "Hesabım", "user"],
@@ -681,8 +681,6 @@ function renderSettings() {
     body = `<section class="card compact"><div class="row between"><div><h3>Web hata günlükleri</h3><p>Son 80 kayıt bu tarayıcıda saklanır.</p></div><button class="button danger small-button" data-action="clear-logs">Temizle</button></div></section>
       ${state.logs.length ? state.logs.map(l=>`<div class="log-row"><strong>${esc(l.id)} • ${esc(l.title)}</strong><span>${esc(fmtDate(l.at))}</span><p>${esc(l.message)}</p>${l.details?`<p>${esc(l.details)}</p>`:""}</div>`).join("") : '<div class="empty-state"><div class="empty-icon">' + icon("check") + '</div><strong>Henüz hata kaydı yok</strong><p>Web sürümünde oluşan hatalar burada listelenir.</p></div>'}
       <button class="button secondary full" data-action="export-logs">Hata kayıtlarını JSON indir</button>`;
-  } else if (tab === "Kısayollar") {
-    body = `<section class="card"><h3>Hızlı erişim</h3><div class="form-actions" style="margin-top:13px"><button class="button secondary" data-page="home">Ana sayfa</button><button class="button secondary" data-page="devices">Cihazlarım</button><button class="button secondary" data-page="remote">PC Kumandası</button><button class="button secondary" data-page="files">PcFiles</button></div></section>`;
   }
   return `
     ${renderHeading("Ayarlar","MynAssistant tercihlerini yönet.")}
