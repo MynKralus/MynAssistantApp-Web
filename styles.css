@@ -742,42 +742,63 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
 /* Centered, continuously rotating MynAssistant emblem */
 .home-command-stage {
   width: 100%;
-  min-height: min(590px, calc(100dvh - 230px));
+  min-height: min(690px, calc(100dvh - 220px));
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
   text-align: center;
-  padding: clamp(18px, 5vh, 50px) 18px 20px;
-  gap: clamp(18px, 3.6vh, 30px);
+  padding: clamp(12px, 3.8vh, 38px) 18px 20px;
+  gap: clamp(20px, 4vh, 32px);
 }
-.home-orbit-logo {
-  width: clamp(210px, 59vw, 330px);
+.home-logo-motion-stage {
+  width: clamp(210px, 64vw, 300px);
   aspect-ratio: 1;
   position: relative;
   display: grid;
   place-items: center;
   flex: 0 0 auto;
   isolation: isolate;
+  overflow: hidden;
+  border-radius: 25px;
+  background: #fff;
+  box-shadow: 0 20px 58px rgba(0, 91, 255, .16), inset 0 0 0 1px rgba(24, 91, 190, .06);
 }
-.home-logo-aura {
+.home-logo-halo {
   position: absolute;
-  inset: 11%;
-  z-index: -1;
+  z-index: 0;
+  inset: 8%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(27,132,255,.20) 0%, rgba(52,99,255,.11) 42%, transparent 72%);
-  filter: blur(17px);
-  animation: myn-aura-pulse 4.1s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(40, 140, 255, .18), rgba(45, 85, 230, .06) 58%, transparent 74%);
+  filter: blur(14px);
+  animation: myn-logo-halo 3.2s ease-in-out infinite alternate;
 }
-.home-logo-spin {
+.home-logo-ribbons {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
   object-fit: contain;
   transform-origin: 50% 50%;
-  animation: myn-logo-rotate 4.1s linear infinite;
+  animation: myn-ribbons-revolve 12s linear infinite;
+  backface-visibility: hidden;
   will-change: transform;
-  filter: drop-shadow(0 12px 24px rgba(0,105,255,.18));
+}
+.home-logo-center {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  clip-path: circle(14.3% at 50.5% 50.3%);
+  transform-origin: 50.5% 50.3%;
+  animation: myn-center-breathe 2s ease-in-out infinite;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 .home-command-copy {
   width: min(100%, 570px);
@@ -806,22 +827,27 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   font-size: clamp(14px, 3.8vw, 17px);
   line-height: 1.55;
 }
-@keyframes myn-logo-rotate {
+@keyframes myn-ribbons-revolve {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-@keyframes myn-aura-pulse {
+@keyframes myn-center-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+@keyframes myn-logo-halo {
   from { opacity: .45; transform: scale(.94); }
   to { opacity: .9; transform: scale(1.05); }
 }
 @media (max-width: 600px) {
   .home-command-stage {
-    min-height: min(610px, calc(100dvh - 245px));
-    padding-top: clamp(12px, 4vh, 34px);
-    gap: clamp(17px, 3.2vh, 25px);
+    min-height: min(650px, calc(100dvh - 218px));
+    padding-top: clamp(12px, 3.5vh, 30px);
+    gap: clamp(20px, 4vh, 27px);
   }
-  .home-orbit-logo { width: clamp(190px, 59vw, 270px); }
+  .home-logo-motion-stage { width: clamp(205px, 64vw, 270px); border-radius: 23px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-logo-spin, .home-logo-aura { animation: none !important; }
+  .home-logo-ribbons, .home-logo-center, .home-logo-halo { animation: none !important; }
 }
+

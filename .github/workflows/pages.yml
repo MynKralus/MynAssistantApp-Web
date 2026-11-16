@@ -70,6 +70,21 @@ jobs:
           test -s mynassistant-logo.webp
           test -s mynassistant-icon-192.png
           test -s mynassistant-icon-512.png
+          test -s assets/mynassistant-ribbons-layer.webp
+          python - <<'PY'
+          from PIL import Image
+          from pathlib import Path
+          path = Path("assets/mynassistant-ribbons-layer.webp")
+          with Image.open(path) as image:
+              if image.format != "WEBP" or image.size != (192, 192) or image.mode != "RGBA":
+                  raise SystemExit("Independent MynAssistant ribbon layer has invalid format, size, or alpha mode.")
+              alpha = image.getchannel("A")
+              if alpha.getextrema()[0] != 0 or alpha.getextrema()[1] == 0:
+                  raise SystemExit("Independent ribbon layer must have a transparent background and visible pixels.")
+          print("Validated transparent independent MynAssistant ribbon layer.")
+          PY
+          grep -q 'home-logo-ribbons' app.js
+          grep -q 'myn-ribbons-revolve' styles.css
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

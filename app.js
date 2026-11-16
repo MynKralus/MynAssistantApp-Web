@@ -254,9 +254,10 @@ function renderDeviceCard(device, showActions = true) {
 
 function renderHome() {
   return '<section class="home-command-stage" aria-label="MynAssistant komut merkezi">' +
-    '<div class="home-orbit-logo" aria-label="Dönen MynAssistant logosu">' +
-      '<div class="home-logo-aura"></div>' +
-      '<img class="home-logo-spin" src="./mynassistant-logo.webp?v=logo-rotor" alt="MynAssistant logosu" fetchpriority="high">' +
+    '<div class="home-logo-motion-stage" data-state="' + (state.speechBusy ? "listening" : "idle") + '" aria-label="Katmanlı MynAssistant logosu">' +
+      '<div class="home-logo-halo" aria-hidden="true"></div>' +
+      '<img class="home-logo-ribbons" src="./assets/mynassistant-ribbons-layer.webp?v=motion-v3" alt="" aria-hidden="true" fetchpriority="high">' +
+      '<img class="home-logo-center" src="./mynassistant-logo.webp?v=motion-v3" alt="MynAssistant merkez logosu" fetchpriority="high">' +
     '</div>' +
     '<div class="home-command-copy"><div class="eyebrow">KOMUT MERKEZİ</div>' +
       '<h1>Sana nasıl yardımcı olabilirim?</h1>' +
@@ -1095,7 +1096,7 @@ function startSpeech() {
   const recognition = new Speech();
   state.speechRecognition = recognition;
   recognition.lang = "tr-TR"; recognition.continuous = false; recognition.interimResults = false;
-  recognition.onstart = () => { state.speechBusy=true; showToast("Dinliyorum…"); };
+  recognition.onstart = () => { state.speechBusy=true; const mark=document.querySelector(".home-logo-motion-stage"); if(mark) mark.dataset.state="listening"; showToast("Dinliyorum…"); };
   recognition.onresult = event => {
     const text = event.results?.[0]?.[0]?.transcript || "";
     const command = text.replace(/^\s*hey\s*m[eı]y[eı]ne[,:]?\s*/i,"").trim();
@@ -1115,7 +1116,7 @@ function startSpeech() {
           : "Ses tanıma tamamlanamadı: " + (errorCode || "bilinmeyen hata");
     logIssue("MYN-WEB-SPEECH-001","Ses tanıma",message,errorCode);
   };
-  recognition.onend = () => { state.speechBusy=false; state.speechRecognition=null; };
+  recognition.onend = () => { state.speechBusy=false; state.speechRecognition=null; const mark=document.querySelector(".home-logo-motion-stage"); if(mark) mark.dataset.state="idle"; };
   try { recognition.start(); } catch(error) { logIssue("MYN-WEB-SPEECH-002","Ses tanıma",error.message || "Mikrofon başlatılamadı."); }
 }
 function downloadTextFile(name, content, type = "application/json") {
