@@ -546,11 +546,39 @@ async function approveDesktopPairing() {
     clearTimeout(timeout); state.pairingBusy = false; render();
   }
 }
+async function postAccountApi(path, payload = null) {
+  if (!state.user) throw new Error("Hesap oturumu gerekli.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const token = await state.user.getIdToken(false);
+    const response = await fetch("https://mynassistant-server.onrender.com"+path,{
+      method:"POST", signal:controller.signal,
+      headers:{Accept:"application/json",Authorization:"Bearer "+token,...(payload ? {"Content-Type":"application/json"} : {})},
+      ...(payload ? {body:JSON.stringify(payload)} : {})
+    });
+    const body = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(body.detail || body.title || "Hesap işlemi tamamlanamadı (HTTP "+response.status+").");
+    return body;
+  } catch(error) {
+    if (error?.name === "AbortError") throw new Error("Hesap sunucusu zamanında yanıt vermedi. Tekrar dene.");
+    throw error;
+  } finally { clearTimeout(timeout); }
+}
+async function sendAccountVerificationEmail() {
+  if (!state.user) throw new Error("Oturum gerekli.");
+  await postAccountApi("/api/v1/account/email/verification");
+  state.profileMessage = "E-posta doğrulama bağlantısı gönderim için kabul edildi. Gelen kutunu ve spam klasörünü kontrol et.";
+  render();
+}
+
 async function savePendingPhoneNumber(rawNumber) {
   if (!state.user) throw new Error("Telefon numarası kaydetmek için giriş yap.");
   const number = String(rawNumber || "").trim();
-  const normalized = number.replace(/[\s()-]/g,"");
-  if (!/^\+?[1-9]\d{7,14}$/.test(normalized)) throw new Error("Telefon numarasını ülke koduyla gir. Örnek: +905XXXXXXXXX.");
+  let normalized = number.replace(/[\s()-]/g,"");
+  if (/^0?5\d{9}$/.test(normalized)) normalized = "+90" + normalized.replace(/^0/,"");
+  else if (/^905\d{9}$/.test(normalized)) normalized = "+" + normalized;
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) throw new Error("Telefon numarasını ülke koduyla gir. Örnek: +905XXXXXXXXX.");
   await setDoc(doc(db,"users",state.user.uid),{pendingPhoneNumber:normalized,pendingPhoneVerified:false,updatedAt:serverTimestamp()},{merge:true});
   state.profile = {...(state.profile || {}),pendingPhoneNumber:normalized,pendingPhoneVerified:false};
   state.profileMessage = "Telefon numarası kaydedildi ancak henüz doğrulanmadı. Android uygulamasındaki mevcut ücretsiz mod gerçek SMS göndermediği için bu web ekranı da SMS göndermez.";
@@ -1230,8 +1258,11 @@ async function saveProfile(form) {
       emailVerified:state.user.emailVerified, updatedAt:serverTimestamp()
     },{merge:true});
     if (newEmail && newEmail.toLowerCase() !== state.user.email?.toLowerCase()) {
-      await verifyBeforeUpdateEmail(state.user,newEmail);
-      state.profileMessage = "Yeni e-posta adresine doğrulama bağlantısı gönderildi. Adres doğrulamadan değişmez.";
+      const cleanEmail = newEmail.trim();
+      if (!cleanEmail.includes("@") || cleanEmail.length > 254) throw new Error("Geçerli bir yeni e-posta adresi gir.");
+      await postAccountApi("/api/v1/account/email/change",{newEmail:cleanEmail});
+      await setDoc(doc(db,"users",state.user.uid),{pendingEmailAddress:cleanEmail,pendingEmailVerified:false,updatedAt:serverTimestamp()},{merge:true});
+      state.profileMessage = "Yeni e-posta doğrulama bağlantısı gönderildi. Yeni adres doğrulanana kadar mevcut adresin etkin kalır.";
     } else state.profileMessage = "Profil bilgileri kaydedildi.";
   } finally { state.profileBusy=false; render(); }
 }
@@ -1322,6 +1353,11 @@ document.addEventListener("click", async event => {
     } else if (action === "drawer-open") { state.drawerOpen=true; render(); }
     else if (action === "drawer-close") { state.drawerOpen=false; render(); }
     else if (action === "account-list-toggle") { state.accountListExpanded=!state.accountListExpanded; render(); }
+    else if (action === "choose-profile-photo") { document.getElementById("profile-photo-input")?.click(); }
+    else if (action === "toggle-phone-form") { state.phoneEditOpen=!state.phoneEditOpen; render(); }
+    else if (action === "link-google") { await linkGoogleAccount(); }
+    else if (action === "scan-desktop-qr") { await startDesktopQrScan(); }
+    else if (action === "stop-desktop-qr") { stopDesktopQrScan(); render(); }
     else if (action === "open-target-picker") { state.targetDialogOpen=true; render(); }
     else if (action === "close-target-picker") { state.targetDialogOpen=false; render(); }
     else if (action === "select-android-device") { state.selectedAndroidDeviceId=button.dataset.id; state.commandTargetId="ANDROID"; storageSet("myn-selected-android-device",button.dataset.id); storageSet("myn-command-target","ANDROID"); showToast("Android cihaz komut hedefi olarak seçildi."); render(); }
@@ -1343,7 +1379,7 @@ document.addEventListener("click", async event => {
     }
     else if (action === "verify-email") {
       if (!state.user) throw new Error("Oturum gerekli.");
-      await sendEmailVerification(state.user); state.profileMessage="Doğrulama e-postası gönderildi."; render();
+      await sendAccountVerificationEmail();
     }
     else if (action === "refresh-devices") { subscribeDevices(); }
     else if (action === "select-device") {
@@ -1400,6 +1436,10 @@ document.addEventListener("submit", async event => {
     event.preventDefault();
     state.pairingCode=String(new FormData(event.target).get("code") || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
     await approveDesktopPairing();
+  } else if (event.target.id==="desktop-pairing-form") {
+    event.preventDefault();
+    state.pairingCode=String(new FormData(event.target).get("code") || "").replace(/[^A-Za-z0-9]/g,"").toUpperCase();
+    await approveDesktopPairing();
   } else if (event.target.id==="phone-form") {
     event.preventDefault();
     try { await savePendingPhoneNumber(new FormData(event.target).get("phone")); }
@@ -1435,6 +1475,9 @@ document.addEventListener("change", async event => {
     const file=el.files?.[0]; if (!file) return;
     await uploadProfilePhoto(file);
     el.value="";
+  } else if (el.id==="profile-photo-input") {
+    const file=el.files?.[0]; if (!file) return;
+    await uploadProfilePhoto(file); el.value="";
   } else if (el.id==="files-upload-input") {
     const file=el.files?.[0]; if (!file) return;
     try { await uploadPcFile(file); } catch(error) { logIssue("MYN-WEB-FILES-002","Dosya yükleme",error?.message || "Dosya yüklenemedi."); }
