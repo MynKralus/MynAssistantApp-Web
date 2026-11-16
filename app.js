@@ -865,7 +865,7 @@ async function enqueueCommand(device, command, payload = {}, timeoutMs = COMMAND
   }
   if (state.busy) throw new Error("Önceki işlem tamamlanmalı. Yinelenen komut gönderilmedi.");
   state.busy = true;
-  state.feedback = "Komut bilgisayara gönderiliyor…";
+  state.feedback = androidTarget ? "Komut Android cihaza gönderiliyor…" : "Komut Windows bilgisayara gönderiliyor…";
   render();
   let unsubscribe = null;
   let timeout = null;
@@ -880,7 +880,7 @@ async function enqueueCommand(device, command, payload = {}, timeoutMs = COMMAND
       ...payload
     });
     state.activeCommandId = ref.id;
-    state.feedback = "Komut bilgisayara iletildi; işlem sonucu bekleniyor.";
+    state.feedback = androidTarget ? "Komut Android cihaza iletildi; işlem sonucu bekleniyor." : "Komut Windows bilgisayara iletildi; işlem sonucu bekleniyor.";
     render();
     const result = await new Promise((resolve,reject) => {
       let settled = false;
@@ -901,7 +901,7 @@ async function enqueueCommand(device, command, payload = {}, timeoutMs = COMMAND
       },error=>finish(reject,new Error("Komut durumu okunamadı: " + (error?.code || "bağlantı hatası"))));
     });
     state.feedback = result.result || (result.status === "completed" ? "İşlem tamamlandı." : "İşlem tamamlanamadı.");
-    if (result.status !== "completed") logIssue("MYN-WEB-COMMAND-002","Windows komutu",state.feedback,String(result.status));
+    if (result.status !== "completed") logIssue("MYN-WEB-COMMAND-002",androidTarget ? "Android komutu" : "Windows komutu",state.feedback,String(result.status));
     showToast(state.feedback);
     return result;
   } catch (error) {
