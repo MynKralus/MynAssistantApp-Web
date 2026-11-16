@@ -187,40 +187,41 @@ function navigate(page) {
 }
 
 function renderDrawer() {
-  const activeLabel = ({
-    home:"Ana sayfa",account:"Hesabım",devices:"Cihazlarım",settings:"Ayarlar",remote:"PC Kumandası",files:"PcFiles"
-  })[state.page];
+  const activeLabel = ({home:"Ana sayfa",account:"Hesabım",devices:"Cihazlarım",settings:"Ayarlar",remote:"PC Kumandası",files:"PcFiles"})[state.page];
   const user = state.user;
-  return `
-    <div class="drawer-backdrop ${state.drawerOpen ? "" : "hidden"}" data-action="drawer-close"></div>
-    <aside class="drawer ${state.drawerOpen ? "open" : ""}" aria-label="Uygulama menüsü">
-      <div class="drawer-account">
-        ${user?.photoURL ? `<img class="avatar" src="${esc(user.photoURL)}" alt="Profil fotoğrafı" referrerpolicy="no-referrer">` : `<img class="avatar" src="./mynassistant-logo.webp" alt="MynAssistant logosu">`}
-        <div class="drawer-account-copy">
-          <strong>${esc(user?.displayName || (user?.email ? user.email.split("@")[0] : "MynAssistant"))}</strong>
-          <span>${esc(user?.email || "Giriş yap veya kayıt ol")}</span>
-        </div>
-        <button class="icon-button" data-action="drawer-close" aria-label="Menüyü kapat">${icon("close")}</button>
-      </div>
-      ${NAV.map(([id,label,ic]) => `<button class="nav-item ${activeLabel === label ? "active" : ""}" data-page="${id}">${icon(ic)}<span>${label}</span></button>`).join("")}
-      <button class="nav-item ${state.page === "diagnostics" ? "active" : ""}" data-page="diagnostics">${icon("alert")}<span>Hata kayıtları</span></button>
-      <div class="drawer-footer">
-        ${user ? '<button class="button danger full" data-action="logout">Çıkış yap</button>' : '<button class="button full" data-page="auth">Giriş yap / Kayıt ol</button>'}
-        <p class="muted tiny" style="text-align:center;margin:12px 0 0">MynAssistant Web • ${APP_VERSION}</p>
-      </div>
-    </aside>`;
+  const nav = NAV.map(([id,label,ic]) => '<button class="nav-item ' + (activeLabel === label ? 'active' : '') + '" data-page="' + id + '">' + icon(ic) + '<span>' + label + '</span></button>').join("");
+  const accountImage = user?.photoURL ? '<img class="avatar" src="' + esc(user.photoURL) + '" alt="Profil fotoğrafı" referrerpolicy="no-referrer">' : '<img class="avatar" src="./mynassistant-logo.webp" alt="MynAssistant logosu">';
+  const accountSwitcher = state.accountListExpanded && user ? '<div class="account-switcher">' +
+    '<p>Google hesabı</p>' +
+    '<div class="account-current">' + accountImage + '<div><strong>' + esc(user.displayName || 'MynAssistant') + '</strong><span>' + esc(user.email || '') + '</span></div></div>' +
+    '<p class="muted tiny">Başka bir Google hesabıyla devam etmek için hesap seçiciyi aç.</p>' +
+    '<button class="button secondary full" data-action="google-login">Hesap değiştir</button>' +
+    '<button class="link-button full-link" data-action="google-login">＋ Hesap ekle</button>' +
+    '</div>' : '';
+  return '<div class="drawer-backdrop ' + (state.drawerOpen ? '' : 'hidden') + '" data-action="drawer-close"></div>' +
+    '<aside class="drawer ' + (state.drawerOpen ? 'open' : '') + '" aria-label="Uygulama menüsü">' +
+    '<div class="drawer-account drawer-account-android">' + accountImage +
+    '<div class="drawer-account-copy"><strong>' + esc(user?.displayName || (user?.email ? user.email.split('@')[0] : 'MynAssistant')) + '</strong><span>' + esc(user?.email || 'Giriş yap veya kayıt ol') + '</span></div>' +
+    (user ? '<button class="account-chevron" data-action="account-list-toggle" aria-label="Hesap seçenekleri">' + (state.accountListExpanded ? '▲' : '▼') + '</button>' : '') +
+    '</div>' + accountSwitcher + nav +
+    '<button class="nav-item ' + (state.page === 'diagnostics' ? 'active' : '') + '" data-page="diagnostics">' + icon('alert') + '<span>Hata kayıtları</span></button>' +
+    '<div class="drawer-footer">' + (user ? '<button class="button danger full" data-action="logout">Çıkış yap</button>' : '<button class="button full" data-page="auth">Giriş yap / Kayıt ol</button>') +
+    '<p class="muted tiny" style="text-align:center;margin:12px 0 0">MynAssistant • Android 0.6.3 • Web</p></div></aside>';
 }
+
 function renderHeader() {
   const online = onlinePcDevices().length;
-  return `
-    <header class="topbar">
-      <button class="icon-button" data-action="drawer-open" aria-label="Menüyü aç">${icon("menu")}</button>
-      <div class="brand"><img src="./mynassistant-logo.webp" alt=""><div class="brand-copy"><strong>MynAssistant</strong><small>PERSONAL ASSISTANT</small></div></div>
-      <div class="topbar-spacer"></div>
-      <div class="header-status" title="${online} çevrimiçi bilgisayar"><span class="status-dot ${online ? "online" : ""}"></span><span>${online ? online + " cihaz çevrimiçi" : "Cihazlar bekleniyor"}</span></div>
-      <button class="icon-button" data-action="toggle-theme" aria-label="Temayı değiştir">${icon(state.theme === "dark" ? "sun" : "moon")}</button>
-    </header>`;
+  return [
+    '<header class="topbar myn-toolbar">',
+    '<button class="icon-button toolbar-menu" data-action="drawer-open" aria-label="Menüyü aç">' + icon("menu") + '</button>',
+    '<div class="topbar-spacer"></div>',
+    '<button class="toolbar-remote" data-page="remote" aria-label="PC Kumandası">' + icon("remote") + '</button>',
+    '<span class="header-online-dot ' + (online ? 'online' : '') + '" title="' + online + ' çevrimiçi Windows cihazı"></span>',
+    '<button class="theme-pill" data-action="toggle-theme" aria-label="Temayı değiştir">' + icon(state.theme === "dark" ? "sun" : "moon") + '<span>' + (state.theme === "dark" ? 'Açık' : 'Koyu') + '</span></button>',
+    '</header>'
+  ].join("");
 }
+
 function renderHeading(title, subtitle = "") {
   return `<div class="page-heading"><div><h1>${esc(title)}</h1>${subtitle ? `<p>${esc(subtitle)}</p>` : ""}</div></div>`;
 }
@@ -252,41 +253,17 @@ function renderDeviceCard(device, showActions = true) {
 
 function renderHome() {
   const target = currentDevice();
-  const canSend = !!state.user && !!target && isOnline(target);
-  return `
-    <section class="hero-identity" aria-label="MynAssistant">
-      <div class="hero-avatar-shell">
-        <img class="hero-avatar" src="./mynassistant-logo.webp" alt="MynAssistant asistan logosu">
-      </div>
-      <div class="hero-identity-copy">
-        <span class="hero-kicker"><span class="status-dot online"></span> KİŞİSEL ASİSTAN</span>
-        <h1>MynAssistant</h1>
-        <p>Kişisel asistanın. Komutların, cihazların ve araçların tek merkezde.</p>
-      </div>
-    </section>
-    <section class="card hero-card">
-      <div class="eyebrow">KOMUT MERKEZİ</div>
-      <h2>Sana nasıl yardımcı olabilirim?</h2>
-      <p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p>
-    </section>
-    ${!state.firebaseReady ? '<div class="notice warning">Firebase Web uygulaması yapılandırılmadı. Sayfaları önizleyebilirsin; giriş, canlı cihazlar ve komut gönderimi Web SDK yapılandırmasını tamamlayınca etkinleşir.</div>' : ""}
-    <section class="section-stack">
-      <div class="section-heading"><h2>Hızlı erişim</h2><span class="muted tiny">MynAssistant</span></div>
-      <div class="grid-2">
-        <button class="card compact" data-page="devices" style="text-align:left;cursor:pointer"><div class="row">${icon("devices")}<strong>Cihazlarım</strong></div><p>${state.devicesLoading ? "Cihazlar aranıyor…" : pcDevices().length + " kayıtlı cihaz"}</p></button>
-        <button class="card compact" data-page="remote" style="text-align:left;cursor:pointer"><div class="row">${icon("remote")}<strong>PC Kumandası</strong></div><p>Bilgisayarını uzaktan kontrol et.</p></button>
-        <button class="card compact" data-page="files" style="text-align:left;cursor:pointer"><div class="row">${icon("folder")}<strong>PcFiles</strong></div><p>Bilgisayar dosyalarını görüntüle.</p></button>
-        <button class="card compact" data-page="settings" style="text-align:left;cursor:pointer"><div class="row">${icon("settings")}<strong>Ayarlar</strong></div><p>Hesap ve uygulama tercihleri.</p></button>
-      </div>
-    </section>
-    <section class="card compact">
-      <div class="section-heading"><h3>Komut hedefi</h3><span class="pill ${canSend ? "success" : "warning"}">${canSend ? "Hazır" : "Bağlantı bekleniyor"}</span></div>
-      <p>${esc(target?.name || "Henüz çevrimiçi Windows bilgisayarı bulunamadı.")}</p>
-      ${!state.user ? '<button class="button full" data-page="auth" style="margin-top:12px">Giriş yap / Kayıt ol</button>' : ""}
-      ${state.devicesError ? `<p class="text-danger">${esc(state.devicesError)}</p><button class="button secondary small-button" data-action="refresh-devices">Yeniden dene</button>` : ""}
-    </section>
-    ${state.feedback ? `<p class="muted small">${esc(state.feedback)}</p>` : ""}
-  `;
+  const online = !!target && isOnline(target) && target.connectionMode === 'firebase-agent';
+  return '<section class="hero-brand android-home-brand">' +
+    '<img src="./mynassistant-logo.webp" alt="MynAssistant">' +
+    '<div><h1>MynAssistant</h1><p>Kişisel asistanın için yeni başlangıç.</p></div></section>' +
+    '<section class="card hero-card android-command-card">' +
+    '<div class="eyebrow">KOMUT MERKEZİ</div>' +
+    '<h2>Sana nasıl yardımcı olabilirim?</h2>' +
+    '<p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p>' +
+    '</section>' +
+    (state.user ? '<div class="home-presence-row"><span class="pill ' + (online ? 'success' : 'warning') + '"><span class="status-dot ' + (online ? 'online' : '') + '"></span>' + (online ? 'Windows bilgisayar çevrimiçi' : 'Cihaz bekleniyor') + '</span><button class="link-button" data-page="devices">Cihazlarım</button></div>' : '') +
+    (state.feedback ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : '');
 }
 
 function renderAuth() {
