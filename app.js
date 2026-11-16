@@ -509,28 +509,44 @@ function renderDiagnostics() {
 
 function renderComposer() {
   if (state.page !== "home") return "";
-  const device = currentDevice();
-  const disabled = !state.user || !device || !isOnline(device) || state.busy;
-  return `
-    <div class="composer-wrap">
-      <form class="composer" id="command-form">
-        <div class="composer-top">
-          <select class="composer-target" id="command-target" aria-label="Komut hedefi">
-            <option value="AUTO" ${state.commandTargetId==="AUTO"?"selected":""}>＋ Otomatik hedef</option>
-            ${pcDevices().map(d=>`<option value="${esc(d.id)}" ${state.commandTargetId===d.id?"selected":""}>${esc(d.name || "Windows cihazı")}</option>`).join("")}
-          </select>
-          <span class="muted tiny">${device ? esc(device.name || "Windows PC") : "Bilgisayar bekleniyor"}</span>
-        </div>
-        <div class="composer-input-row">
-          <input class="composer-input" id="command-input" maxlength="1000" autocomplete="off" placeholder="Bir şey iste…" value="${esc(state.commandText)}" ${disabled?"":" "}>
-          <button type="button" class="round-action" data-action="speech-start" title="Sesli komut" ${"SpeechRecognition" in window || "webkitSpeechRecognition" in window ? "" : "disabled"}>${icon("mic")}</button>
-          <button type="submit" class="round-action primary" aria-label="Komutu gönder" ${disabled?"disabled":""}>${icon("send")}</button>
-        </div>
-      </form>
-      ${!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Komut göndermek için hesabına giriş yap.</p>' : ""}
-      ${state.feedback ? `<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">${esc(state.feedback)}</p>` : ""}
-    </div>`;
+  const pc = currentDevice();
+  const android = androidDevices().find(device => device.id === state.selectedAndroidDeviceId);
+  const targetDescription = state.commandTargetId === "PC" ? (pc ? deviceDisplayName(pc) : "Windows bilgisayar bekleniyor") :
+    state.commandTargetId === "ANDROID" ? (android ? deviceDisplayName(android) : "Android cihaz seçilmedi") :
+    state.commandTargetId === "PHONE" ? "Bu telefon (Android)" : "Komuta göre telefon veya kullanılabilir bilgisayar";
+  return '<div class="composer-wrap"><form class="composer android-composer" id="command-form">' +
+    '<div class="composer-top"><button type="button" class="composer-target" data-action="open-target-picker">' + icon("plus") + '<span>' + esc(commandTargetLabel()) + '</span><span class="target-chevron">⌄</span></button><span class="muted tiny composer-target-description">' + esc(targetDescription) + '</span></div>' +
+    '<div class="composer-input-row"><input class="composer-input" id="command-input" maxlength="1000" autocomplete="off" placeholder="Komut yaz…" value="' + esc(state.commandText) + '" ' + (state.busy ? 'disabled' : '') + '>' +
+    '<button type="button" class="round-action" data-action="speech-start" title="Sesli komut" ' + (("SpeechRecognition" in window || "webkitSpeechRecognition" in window) ? '' : 'disabled') + '>' + icon("mic") + '</button>' +
+    '<button type="submit" class="round-action primary" aria-label="Komutu gönder" ' + (state.busy ? 'disabled' : '') + '>' + icon("send") + '</button></div>' +
+    '</form>' +
+    (!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Bulut cihazlarına komut göndermek için MynAssistant hesabına giriş yap.</p>' : '') +
+    (state.feedback ? '<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">' + esc(state.feedback) + '</p>' : '') +
+    '</div>';
 }
+
+function renderTargetDialog() {
+  if (!state.targetDialogOpen) return "";
+  const selected = state.commandTargetId;
+  const choose = (id, deviceId = "") => '<button class="target-option ' + (selected === id && (!deviceId || deviceId === state.selectedDeviceId || deviceId === state.selectedAndroidDeviceId) ? 'selected' : '') + '" data-target="' + id + '" data-target-id="' + esc(deviceId) + '">' +
+    '<span class="target-option-icon">' + icon(id === "PC" ? "monitor" : id === "ANDROID" || id === "PHONE" ? "devices" : "settings") + '</span><span class="target-option-copy"><strong>' +
+    esc(id === "AUTO" ? "Otomatik hedef" : id === "PHONE" ? (isAndroidBrowser() ? "Bu telefon (Android)" : "Bu cihaz (Web)") : deviceId ? esc(deviceDisplayName((id === "PC" ? pcDevices() : androidDevices()).find(d => d.id === deviceId))) : (id === "PC" ? "Windows bilgisayar" : "Android cihaz")) +
+    '</strong><small>' + (id === "AUTO" ? 'Komuta göre telefon veya kullanılabilir bilgisayar' : id === "PHONE" ? 'Bu tarayıcı Android sistem komutlarını doğrudan çalıştıramaz' : deviceId ? ((isOnline((id === "PC" ? pcDevices() : androidDevices()).find(d => d.id === deviceId))) ? (id === "PC" ? 'Windows · Çevrimiçi' : 'Android · Çevrimiçi') : (id === "PC" ? 'Windows · Çevrimdışı' : 'Android · Çevrimdışı')) : 'Cihaz seçimi') + '</small></span>' +
+    '<span class="target-check">' + (selected === id && (!deviceId || deviceId === state.selectedDeviceId || deviceId === state.selectedAndroidDeviceId) ? icon("check") : '') + '</span></button>';
+  const windows = pcDevices();
+  const androids = androidDevices();
+  const windowsBody = !state.user ? '<div class="target-empty">Windows cihazlarını görmek için giriş yap.</div>' : state.devicesLoading ? '<div class="target-empty">Cihazlar yükleniyor…</div>' : state.devicesError ? '<div class="target-empty">' + esc(state.devicesError) + ' <button class="link-button" data-action="refresh-devices">Yeniden dene</button></div>' : windows.length ? windows.map(d => choose("PC", d.id)).join("") : '<div class="target-empty">Bu hesapta kayıtlı Windows cihazı bulunamadı.</div>';
+  const androidBody = !state.user ? '<div class="target-empty">Android cihazlarını görmek için giriş yap.</div>' : androids.length ? androids.map(d => choose("ANDROID", d.id)).join("") : '<div class="target-empty">Bu hesaba kayıtlı başka Android cihazı bulunamadı.</div>';
+  return '<div class="target-modal-backdrop" data-action="close-target-picker"><section class="target-modal" role="dialog" aria-modal="true" aria-labelledby="target-modal-title" onclick="event.stopPropagation()">' +
+    '<div class="target-modal-head"><h2 id="target-modal-title">Komut hedefi ve cihaz seç</h2><button class="icon-button" data-action="close-target-picker" aria-label="Kapat">' + icon("close") + '</button></div>' +
+    '<div class="target-modal-scroll"><h3>Komut hedefi</h3>' + choose("AUTO") + choose("PHONE") +
+    '<h3>Kayıtlı Windows cihazları</h3>' + windowsBody +
+    '<h3>Kayıtlı Android cihazları</h3>' + androidBody + '</div>' +
+    '<div class="target-modal-footer"><button class="button ghost full" data-action="close-target-picker">Kapat</button></div>' +
+    '</section></div>';
+}
+
+function isAndroidBrowser() { return /Android/i.test(navigator.userAgent); }
 
 function render() {
   setTheme(state.theme);
@@ -546,6 +562,7 @@ function render() {
     <div class="workspace"><main class="app-main">${content}</main></div>
     ${renderComposer()}
     ${renderDrawer()}
+    ${renderTargetDialog()}
   `;
 }
 
