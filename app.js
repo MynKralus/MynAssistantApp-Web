@@ -253,15 +253,16 @@ function renderDeviceCard(device, showActions = true) {
 }
 
 function renderHome() {
-  return '<section class="hero-brand android-home-brand">' +
-    '<img src="./mynassistant-logo.webp" alt="MynAssistant">' +
-    '<div><h1>MynAssistant</h1><p>Kişisel asistanın için yeni başlangıç.</p></div></section>' +
-    '<section class="card hero-card android-command-card">' +
-    '<div class="eyebrow">KOMUT MERKEZİ</div>' +
-    '<h2>Sana nasıl yardımcı olabilirim?</h2>' +
-    '<p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p>' +
-    '</section>' +
-    (state.feedback ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : "");
+  return '<section class="home-command-stage" aria-label="MynAssistant komut merkezi">' +
+    '<div class="home-orbit-logo" aria-label="Dönen MynAssistant logosu">' +
+      '<div class="home-logo-aura"></div>' +
+      '<img class="home-logo-spin" src="./mynassistant-logo.webp?v=logo-rotor" alt="MynAssistant logosu" fetchpriority="high">' +
+    '</div>' +
+    '<div class="home-command-copy"><div class="eyebrow">KOMUT MERKEZİ</div>' +
+      '<h1>Sana nasıl yardımcı olabilirim?</h1>' +
+      '<p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p></div>' +
+    (state.feedback ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : "") +
+    '</section>';
 }
 
 function renderAuth() {
