@@ -781,7 +781,7 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   height: 100%;
   display: block;
   object-fit: contain;
-  transform-origin: 50% 50%;
+  transform-origin: 50.46% 50.28%;
   animation: myn-ribbons-revolve 12s linear infinite;
   backface-visibility: hidden;
   will-change: transform;
@@ -794,8 +794,8 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   height: 100%;
   display: block;
   object-fit: contain;
-  clip-path: circle(14.3% at 50.5% 50.3%);
-  transform-origin: 50.5% 50.3%;
+  clip-path: circle(14.3% at 50.46% 50.28%);
+  transform-origin: 50.46% 50.28%;
   animation: myn-center-breathe 2s ease-in-out infinite;
   backface-visibility: hidden;
   will-change: transform;
@@ -829,11 +829,18 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
 }
 @keyframes myn-ribbons-revolve {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to { transform: rotate(-360deg); }
 }
 @keyframes myn-center-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.045); }
+}
+.home-logo-motion-stage[data-state="listening"] .home-logo-center {
+  animation: myn-center-listen 3s ease-in-out infinite;
+}
+@keyframes myn-center-listen {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.035); }
 }
 @keyframes myn-logo-halo {
   from { opacity: .45; transform: scale(.94); }
