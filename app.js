@@ -2,7 +2,8 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebas
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, setPersistence, browserLocalPersistence,
   createUserWithEmailAndPassword, signInWithPopup, signInWithRedirect,
-  getRedirectResult, GoogleAuthProvider, signOut, updateProfile,
+  getRedirectResult, GoogleAuthProvider, linkWithPopup, signOut, updateProfile, reload,
+  PhoneAuthProvider, RecaptchaVerifier, updatePhoneNumber,
   sendEmailVerification, sendPasswordResetEmail, verifyBeforeUpdateEmail
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 import {
@@ -73,11 +74,17 @@ function loadLogs() {
 }
 const state = {
   firebaseReady: false, authReady: false, authBusy: false, user: null, page: "home", settingsTab: "Genel", authMode: "login",
+  targetDialogOpen: false, accountListExpanded: false, pairingCode: "", pairingQrSignature: "", pairingQrExpiresAtUnix: 0,
+  pairingBusy: false, pairingStatus: "Windows uygulamasından yeni bir eşleştirme kodu al.", pairingScannerActive: false,
+  phoneEditOpen: false, phoneNumberDraft: "", phoneVerificationId: "", phoneCodeDraft: "", phoneBusy: false,
+  profilePhotoBusy: false, remoteTouchpadEnabled: storageGet("myn-remote-touchpad", "true") !== "false",
+  remoteKeyboardEnabled: storageGet("myn-remote-keyboard", "true") !== "false",
   theme: storageGet("myn-theme", "dark"), drawerOpen: false,
   devices: [], devicesLoading: false, devicesError: "",
   profile: null, profileBusy: false, profileMessage: "",
   selectedDeviceId: storageGet("myn-selected-device", ""),
-  commandTargetId: "AUTO", commandText: "", busy: false, activeCommandId: "",
+  commandTargetId: storageGet("myn-command-target", "AUTO"), selectedAndroidDeviceId: storageGet("myn-selected-android-device", ""),
+  commandText: "", busy: false, activeCommandId: "",
   feedback: "", logs: loadLogs(),
   fileListing: null, filesDeviceId: "", filesLoading: false,
   filePath: "", remoteScreenEnabled: true, speechBusy: false,
@@ -115,6 +122,23 @@ function pcDevices() {
   );
 }
 function onlinePcDevices() { return pcDevices().filter(isOnline); }
+function androidDevices() {
+  const pcIds = new Set(pcDevices().map(device => device.id));
+  return state.devices.filter(device => !pcIds.has(device.id) && (
+    String(device.platform || device.type || device.os || "").toLowerCase() === "android" || String(device.id || "").startsWith("android-")
+  ));
+}
+function onlineAndroidDevices() { return androidDevices().filter(isOnline); }
+function isAndroidDevice(device) {
+  return !!device && (String(device.platform || device.type || device.os || "").toLowerCase() === "android" || String(device.id || "").startsWith("android-"));
+}
+function deviceDisplayName(device) { return device?.name || device?.deviceName || (isAndroidDevice(device) ? "Android cihaz" : "Windows bilgisayar"); }
+function commandTargetLabel() {
+  if (state.commandTargetId === "PHONE") return "Bu telefon (Android)";
+  if (state.commandTargetId === "PC") return deviceDisplayName(pcDevices().find(d => d.id === state.selectedDeviceId) || currentDevice()) || "Windows bilgisayar";
+  if (state.commandTargetId === "ANDROID") return deviceDisplayName(androidDevices().find(d => d.id === state.selectedAndroidDeviceId)) || "Android cihaz";
+  return "Otomatik hedef";
+}
 function currentDevice() {
   const list = pcDevices();
   return list.find(d => d.id === state.selectedDeviceId) || list.find(isOnline) || list[0] || null;
