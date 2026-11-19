@@ -19,3 +19,7 @@ Ana sayfa avatarı, başlık simgesi, favicon ve PWA simgesi `mynassistant-logo.
 Google authentication uses `signInWithPopup` on mobile and desktop. The earlier mobile-only redirect flow has been removed because this site is hosted on GitHub Pages while Firebase's OAuth helper uses the `firebaseapp.com` domain; third-party storage restrictions can interrupt redirect sign-in on modern browsers. The app now explicitly uses local Firebase Auth persistence, completes any pending legacy redirect result at startup, and returns a successful user to the home screen while subscribing to that user's devices.
 
 The Google account chooser may still display `myncloud-24.firebaseapp.com`. This is the Firebase `authDomain` used as the OAuth redirect host, not the visible name of the website. It cannot be safely replaced by editing a display string or by changing it to the GitHub Pages hostname. Hiding it requires a real custom auth domain with Firebase Hosting or an equivalent same-domain auth-helper proxy, plus the corresponding authorized OAuth redirect URI.
+
+## Web soru-cevap
+
+Ana sayfada giriş yaptıktan sonra **Soru sor** moduyla genel yapay zekâ sohbeti kullanılabilir. **Cihaz komutu** modu, mevcut Windows/Android cihaz komutları için ayrı tutulmuştur. Sohbet istekleri `https://mynassistant-server.onrender.com/api/v1/assistant/chat` adresine Firebase ID token ile gönderilir. Sağlayıcı API anahtarı web JavaScript dosyalarında bulunmaz; sunucunun Render Environment ayarlarında tutulur.
