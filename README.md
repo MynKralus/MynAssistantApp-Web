@@ -23,3 +23,11 @@ The Google account chooser may still display `myncloud-24.firebaseapp.com`. This
 ## Web soru-cevap
 
 Ana sayfada giriş yaptıktan sonra **Soru sor** moduyla genel yapay zekâ sohbeti kullanılabilir. **Cihaz komutu** modu, mevcut Windows/Android cihaz komutları için ayrı tutulmuştur. Sohbet istekleri `https://mynassistant-server.onrender.com/api/v1/assistant/chat` adresine Firebase ID token ile gönderilir. Sağlayıcı API anahtarı web JavaScript dosyalarında bulunmaz; sunucunun Render Environment ayarlarında tutulur.
+
+### Sohbet oturumları ve geçmiş
+
+- Sohbetler Firebase Authentication UID'sine göre bu tarayıcının yerel depolamasında ayrı tutulur; başka bir hesap aynı geçmişi görüntüleyemez.
+- Tarayıcı yenilendiğinde veya kullanıcı aynı hesapla tekrar giriş yaptığında son aktif sohbet geri yüklenir.
+- Son 8 sohbet ve sohbet başına son 40 mesaj saklanır. Yapay zekâ isteğine bağlam olarak son 12 mesaj gönderilir.
+- Sohbet seçiciyle önceki oturuma dönülebilir; **Yeni sohbet** bağlamı sıfırlar, **Sil** yalnızca seçili yerel sohbeti siler.
+- Bu kayıtlar Render sunucusuna veya Firestore'a yüklenmez ve başka cihazlarla eşitlenmez. Tarayıcı verisi temizlenirse yerel geçmiş de silinir.
