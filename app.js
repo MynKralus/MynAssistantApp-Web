@@ -15,6 +15,8 @@ const APP_VERSION = "0.3.0-web";
 const MAX_TRANSFER_BYTES = 500_000;
 const COMMAND_TIMEOUT_MS = 90_000;
 const ONLINE_WINDOW_MS = 180_000;
+const MAX_ASSISTANT_SESSIONS = 8;
+const MAX_ASSISTANT_MESSAGES = 40;
 const SETTINGS_TABS = ["Genel", "Agent", "Hesap", "İzinler", "Eklentiler", "Başlangıç", "Hata günlükleri"];
 const NAV = [
   ["home", "Ana sayfa", "home"],
@@ -66,6 +68,140 @@ function storageSet(key, value) {
 function storageRemove(key) {
   try { localStorage.removeItem(key); } catch {}
 }
+
+function assistantSessionsStorageKey(uid) {
+  return "myn-assistant-sessions-" + encodeURIComponent(String(uid || ""));
+}
+function createAssistantSession() {
+  const now = new Date().toISOString();
+  return {
+    id: "chat-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 9),
+    title: "Yeni sohbet",
+    createdAt: now,
+    updatedAt: now,
+    messages: []
+  };
+}
+function persistAssistantSessions(updateActivity = true) {
+  const uid = state.user?.uid;
+  if (!uid || !state.assistantSessionId) return false;
+  const current = state.assistantSessions.find(session => session.id === state.assistantSessionId);
+  if (!current) return false;
+
+  current.messages = state.assistantMessages
+    .slice(-MAX_ASSISTANT_MESSAGES)
+    .filter(message => message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string")
+    .map(message => ({role:message.role,content:message.content.slice(0,8000)}));
+
+  const firstQuestion = current.messages.find(message => message.role === "user")?.content?.trim();
+  if (firstQuestion) current.title = firstQuestion.slice(0, 56) + (firstQuestion.length > 56 ? "…" : "");
+  if (updateActivity) current.updatedAt = new Date().toISOString();
+
+  state.assistantSessions = state.assistantSessions
+    .slice()
+    .sort((a,b) => Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0))
+    .slice(0, MAX_ASSISTANT_SESSIONS);
+
+  if (!state.assistantSessions.some(session => session.id === state.assistantSessionId)) {
+    state.assistantSessionId = state.assistantSessions[0]?.id || "";
+  }
+
+  try {
+    localStorage.setItem(assistantSessionsStorageKey(uid), JSON.stringify({
+      version: 1,
+      activeSessionId: state.assistantSessionId,
+      sessions: state.assistantSessions
+    }));
+    return true;
+  } catch(error) {
+    showToast("Sohbet geçmişi bu tarayıcıya kaydedilemedi. Tarayıcı depolama alanını kontrol et.");
+    return false;
+  }
+}
+function restoreAssistantSessions(user) {
+  if (!user?.uid) return;
+  let saved = null;
+  try {
+    const raw = storageGet(assistantSessionsStorageKey(user.uid), "");
+    saved = raw ? JSON.parse(raw) : null;
+  } catch {
+    saved = null;
+  }
+
+  const sessions = Array.isArray(saved?.sessions) ? saved.sessions : [];
+  state.assistantSessions = sessions
+    .filter(session => session && typeof session.id === "string" && session.id.length <= 100)
+    .map(session => ({
+      id: session.id,
+      title: typeof session.title === "string" ? session.title.slice(0, 80) : "Sohbet",
+      createdAt: typeof session.createdAt === "string" ? session.createdAt : new Date().toISOString(),
+      updatedAt: typeof session.updatedAt === "string" ? session.updatedAt : new Date().toISOString(),
+      messages: Array.isArray(session.messages)
+        ? session.messages
+            .filter(message => message && (message.role === "user" || message.role === "assistant") &&
+              typeof message.content === "string" && message.content.length <= 8000)
+            .slice(-MAX_ASSISTANT_MESSAGES)
+            .map(message => ({role:message.role,content:message.content}))
+        : []
+    }))
+    .sort((a,b) => Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0))
+    .slice(0, MAX_ASSISTANT_SESSIONS);
+
+  let active = state.assistantSessions.find(session => session.id === saved?.activeSessionId);
+  if (!active) active = state.assistantSessions[0];
+  if (!active) {
+    active = createAssistantSession();
+    state.assistantSessions.unshift(active);
+  }
+
+  state.assistantSessionId = active.id;
+  state.assistantMessages = active.messages.slice(-MAX_ASSISTANT_MESSAGES);
+  state.assistantError = "";
+  persistAssistantSessions(false);
+}
+function startNewAssistantSession() {
+  if (!state.user || state.assistantBusy) return;
+  persistAssistantSessions();
+  const session = createAssistantSession();
+  state.assistantSessions = [session, ...state.assistantSessions].slice(0, MAX_ASSISTANT_SESSIONS);
+  state.assistantSessionId = session.id;
+  state.assistantMessages = [];
+  state.assistantError = "";
+  persistAssistantSessions(false);
+  render();
+  showToast("Yeni sohbet başlatıldı. Önceki sohbetin geçmişte saklandı.");
+}
+function switchAssistantSession(sessionId) {
+  if (!state.user || state.assistantBusy || !sessionId || sessionId === state.assistantSessionId) return;
+  persistAssistantSessions();
+  const session = state.assistantSessions.find(item => item.id === sessionId);
+  if (!session) return;
+  state.assistantSessionId = session.id;
+  state.assistantMessages = session.messages.slice(-MAX_ASSISTANT_MESSAGES);
+  state.assistantError = "";
+  persistAssistantSessions(false);
+  render();
+}
+function deleteAssistantSession() {
+  if (!state.user || state.assistantBusy) return;
+  const current = state.assistantSessions.find(session => session.id === state.assistantSessionId);
+  const title = current?.title || "Bu sohbet";
+  if (!confirm('"' + title + '" sohbetinin bu tarayıcıdaki geçmişi silinsin mi?')) return;
+
+  state.assistantSessions = state.assistantSessions.filter(session => session.id !== state.assistantSessionId);
+  let next = state.assistantSessions[0];
+  if (!next) {
+    next = createAssistantSession();
+    state.assistantSessions = [next];
+  }
+  state.assistantSessionId = next.id;
+  state.assistantMessages = next.messages.slice(-MAX_ASSISTANT_MESSAGES);
+  state.assistantError = "";
+  persistAssistantSessions(false);
+  render();
+  showToast("Sohbet geçmişi silindi.");
+}
+
 function loadLogs() {
   try {
     const value = JSON.parse(storageGet("myn-web-logs", "[]"));
@@ -86,7 +222,8 @@ const state = {
   commandTargetId: storageGet("myn-command-target", "AUTO"), selectedAndroidDeviceId: storageGet("myn-selected-android-device", ""),
   commandText: "", busy: false, activeCommandId: "",
   composerMode: storageGet("myn-composer-mode", "chat") === "command" ? "command" : "chat",
-  assistantMessages: [], assistantBusy: false, assistantError: "",
+  assistantMessages: [], assistantSessions: [], assistantSessionId: "",
+  assistantBusy: false, assistantError: "",
   feedback: "", logs: loadLogs(),
   fileListing: null, filesDeviceId: "", filesLoading: false,
   filePath: "", remoteScreenEnabled: true, speechBusy: false,
@@ -256,6 +393,22 @@ function renderDeviceCard(device, showActions = true) {
 
 function renderAssistantConversation() {
   if (state.composerMode !== "chat") return "";
+  const activeSession = state.assistantSessions.find(session => session.id === state.assistantSessionId);
+  const questionCount = state.assistantMessages.filter(message => message.role === "user").length;
+  const sessionControls = state.user
+    ? '<div class="assistant-chat-toolbar">' +
+        '<div class="assistant-chat-session-meta"><strong>Sohbet geçmişi</strong><span>' + questionCount + ' soru · ' + state.assistantSessions.length + ' kayıtlı sohbet</span></div>' +
+        '<div class="assistant-chat-session-actions">' +
+          '<select class="select assistant-chat-session-select" id="assistant-session-picker" aria-label="Kayıtlı sohbetler" ' + (state.assistantBusy ? "disabled" : "") + '>' +
+            state.assistantSessions.map(session => '<option value="' + esc(session.id) + '" ' + (session.id === state.assistantSessionId ? "selected" : "") + '>' +
+              esc((session.title || "Sohbet") + " · " + fmtDate(session.updatedAt)) +
+            '</option>').join("") +
+          '</select>' +
+          '<button class="button secondary small-button" type="button" data-action="new-assistant-session" ' + (state.assistantBusy ? "disabled" : "") + '>+ Yeni sohbet</button>' +
+          '<button class="button ghost small-button" type="button" data-action="delete-assistant-session" ' + (state.assistantBusy || !activeSession ? "disabled" : "") + '>Sil</button>' +
+        '</div>' +
+      '</div>'
+    : "";
   const messages = state.assistantMessages.map(message => {
     const role = message.role === "user" ? "user" : "assistant";
     const label = role === "user" ? "Sen" : "MynAssistant";
@@ -268,6 +421,7 @@ function renderAssistantConversation() {
     ? '<div class="assistant-chat-login"><span>Soru sormak için MynAssistant hesabınla giriş yap.</span><button class="button secondary small-button" data-page="auth">Giriş yap</button></div>'
     : "";
   return '<section class="assistant-chat-panel" aria-label="MynAssistant sohbeti">' +
+    sessionControls +
     '<div class="assistant-chat-messages" id="assistant-chat-messages" aria-live="polite" aria-relevant="additions text">' +
       emptyState + messages +
       (state.assistantBusy ? '<div class="assistant-chat-typing" role="status"><span></span><span></span><span></span><small>MynAssistant yanıt hazırlıyor…</small></div>' : '') +
@@ -750,7 +904,7 @@ function renderComposer() {
       '<button type="submit" class="round-action primary" aria-label="' + (chatMode ? "Soruyu gönder" : "Komutu gönder") + '" ' + (sending ? "disabled" : "") + '>' + icon("send") + '</button></div>' +
     '</form>' +
     (chatMode
-      ? '<p class="muted tiny composer-hint">' + (state.user ? "Sohbet geçmişi bu oturum boyunca tutulur." : "Soru-cevap özelliği için giriş yapman gerekir.") + '</p>'
+      ? '<p class="muted tiny composer-hint">' + (state.user ? "Sohbetlerin bu tarayıcıda hesabına bağlı saklanır ve tekrar açılabilir." : "Soru-cevap özelliği için giriş yapman gerekir.") + '</p>'
       : (!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Bulut cihazlarına komut göndermek için MynAssistant hesabına giriş yap.</p>' : "")) +
     (!chatMode && state.feedback ? '<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">' + esc(state.feedback) + '</p>' : "") +
     '</div>';
@@ -1018,9 +1172,12 @@ async function sendAssistantMessage(raw) {
     return;
   }
   if (state.assistantBusy) return;
+  if (!state.assistantSessionId) restoreAssistantSessions(state.user);
 
+  const requestUid = state.user.uid;
   state.assistantMessages.push({role:"user",content});
-  state.assistantMessages = state.assistantMessages.slice(-40);
+  state.assistantMessages = state.assistantMessages.slice(-MAX_ASSISTANT_MESSAGES);
+  persistAssistantSessions();
   state.commandText = "";
   state.assistantError = "";
   state.assistantBusy = true;
@@ -1030,6 +1187,7 @@ async function sendAssistantMessage(raw) {
   const timeout = setTimeout(() => controller.abort(), 72_000);
   try {
     const token = await state.user.getIdToken(false);
+    if (state.user?.uid !== requestUid) return;
     if (!token) throw new Error("MynAssistant oturumu doğrulanamadı. Yeniden giriş yap.");
     const messages = state.assistantMessages.slice(-12).map(message => ({
       role: message.role === "assistant" ? "assistant" : "user",
@@ -1041,6 +1199,7 @@ async function sendAssistantMessage(raw) {
       headers:{Accept:"application/json","Content-Type":"application/json",Authorization:"Bearer "+token},
       body:JSON.stringify({messages})
     });
+    if (state.user?.uid !== requestUid) return;
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
       if (response.status === 401) throw new Error("Oturum doğrulanamadı. Çıkış yapıp tekrar giriş yap.");
@@ -1051,15 +1210,19 @@ async function sendAssistantMessage(raw) {
     const reply = typeof body.reply === "string" ? body.reply.trim() : "";
     if (!reply) throw new Error("Sunucudan boş yanıt geldi. Tekrar deneyebilirsin.");
     state.assistantMessages.push({role:"assistant",content:reply});
-    state.assistantMessages = state.assistantMessages.slice(-40);
+    state.assistantMessages = state.assistantMessages.slice(-MAX_ASSISTANT_MESSAGES);
+    persistAssistantSessions();
   } catch(error) {
-    state.assistantError = error?.name === "AbortError"
-      ? "Yanıt zaman aşımına uğradı. Tekrar deneyebilirsin."
-      : error?.message || "MynAssistant'a bağlanılamadı. İnternet bağlantını kontrol et.";
-    logIssue("MYN-WEB-CHAT-001","Yapay zekâ sohbeti",state.assistantError,error?.name || "");
+    if (state.user?.uid === requestUid) {
+      state.assistantError = error?.name === "AbortError"
+        ? "Yanıt zaman aşımına uğradı. Tekrar deneyebilirsin."
+        : error?.message || "MynAssistant'a bağlanılamadı. İnternet bağlantını kontrol et.";
+      persistAssistantSessions();
+      logIssue("MYN-WEB-CHAT-001","Yapay zekâ sohbeti",state.assistantError,error?.name || "");
+    }
   } finally {
     clearTimeout(timeout);
-    state.assistantBusy = false;
+    if (state.user?.uid === requestUid) state.assistantBusy = false;
     render();
   }
 }
@@ -1290,8 +1453,20 @@ function applyAuthenticatedUser(user, source = "observer") {
   const previousUid = state.user?.uid || "";
   const nextUid = user?.uid || "";
   const changed = previousUid !== nextUid;
+  if (changed && previousUid) persistAssistantSessions();
   state.user = user || null;
   state.authReady = true;
+
+  if (changed) {
+    state.assistantBusy = false;
+    if (user) restoreAssistantSessions(user);
+    else {
+      state.assistantMessages = [];
+      state.assistantSessions = [];
+      state.assistantSessionId = "";
+      state.assistantError = "";
+    }
+  }
 
   if (user) {
     // A successful sign-in always returns the user to the main assistant screen.
@@ -1469,6 +1644,8 @@ document.addEventListener("click", async event => {
     else if (action === "toggle-remote-touchpad") { state.remoteTouchpadEnabled=!state.remoteTouchpadEnabled; storageSet("myn-remote-touchpad",state.remoteTouchpadEnabled); render(); }
     else if (action === "toggle-remote-keyboard") { state.remoteKeyboardEnabled=!state.remoteKeyboardEnabled; storageSet("myn-remote-keyboard",state.remoteKeyboardEnabled); render(); }
     else if (action === "approve-desktop-pairing") { await approveDesktopPairing(); }
+    else if (action === "new-assistant-session") { startNewAssistantSession(); }
+    else if (action === "delete-assistant-session") { deleteAssistantSession(); }
     else if (action === "set-composer-mode") {
       const mode = button.dataset.mode;
       if (mode === "chat" || mode === "command") {
@@ -1567,7 +1744,9 @@ document.addEventListener("submit", async event => {
 });
 document.addEventListener("change", async event => {
   const el=event.target;
-  if (el.id==="remote-device") {
+  if (el.id==="assistant-session-picker") {
+    switchAssistantSession(el.value);
+  } else if (el.id==="remote-device") {
     state.selectedDeviceId=el.value; storageSet("myn-selected-device",el.value);
     if(state.page==="remote") { stopScreenPreview(); startScreenPreview(); }
     render();
