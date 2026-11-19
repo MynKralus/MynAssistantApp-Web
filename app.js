@@ -11,7 +11,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
-const APP_VERSION = "0.2.0-web";
+const APP_VERSION = "0.3.0-web";
 const MAX_TRANSFER_BYTES = 500_000;
 const COMMAND_TIMEOUT_MS = 90_000;
 const ONLINE_WINDOW_MS = 180_000;
@@ -85,6 +85,8 @@ const state = {
   selectedDeviceId: storageGet("myn-selected-device", ""),
   commandTargetId: storageGet("myn-command-target", "AUTO"), selectedAndroidDeviceId: storageGet("myn-selected-android-device", ""),
   commandText: "", busy: false, activeCommandId: "",
+  composerMode: storageGet("myn-composer-mode", "chat") === "command" ? "command" : "chat",
+  assistantMessages: [], assistantBusy: false, assistantError: "",
   feedback: "", logs: loadLogs(),
   fileListing: null, filesDeviceId: "", filesLoading: false,
   filePath: "", remoteScreenEnabled: true, speechBusy: false,
@@ -252,7 +254,31 @@ function renderDeviceCard(device, showActions = true) {
     </article>`;
 }
 
+function renderAssistantConversation() {
+  if (state.composerMode !== "chat") return "";
+  const messages = state.assistantMessages.map(message => {
+    const role = message.role === "user" ? "user" : "assistant";
+    const label = role === "user" ? "Sen" : "MynAssistant";
+    return '<article class="assistant-message assistant-message--' + role + '"><span class="assistant-message-label">' + label + '</span><p>' + esc(message.content) + '</p></article>';
+  }).join("");
+  const emptyState = state.assistantMessages.length
+    ? ""
+    : '<div class="assistant-chat-empty"><strong>Merhaba! Ben MynAssistant.</strong><p>Bir konu sor, metin yazdır, kod hakkında konuş veya bir problemi birlikte çözmemizi iste.</p></div>';
+  const loginNotice = !state.user
+    ? '<div class="assistant-chat-login"><span>Soru sormak için MynAssistant hesabınla giriş yap.</span><button class="button secondary small-button" data-page="auth">Giriş yap</button></div>'
+    : "";
+  return '<section class="assistant-chat-panel" aria-label="MynAssistant sohbeti">' +
+    '<div class="assistant-chat-messages" id="assistant-chat-messages" aria-live="polite" aria-relevant="additions text">' +
+      emptyState + messages +
+      (state.assistantBusy ? '<div class="assistant-chat-typing" role="status"><span></span><span></span><span></span><small>MynAssistant yanıt hazırlıyor…</small></div>' : '') +
+    '</div>' +
+    (state.assistantError ? '<p class="assistant-chat-error" role="alert">' + esc(state.assistantError) + '</p>' : '') +
+    loginNotice +
+  '</section>';
+}
+
 function renderHome() {
+  const chatMode = state.composerMode === "chat";
   return '<section class="home-command-stage" aria-label="MynAssistant komut merkezi">' +
     '<div class="home-logo-motion-stage" data-state="' + (state.speechBusy ? "listening" : "idle") + '" aria-label="Katmanlı MynAssistant logosu">' +
       '<div class="home-logo-halo" aria-hidden="true"></div>' +
@@ -261,11 +287,11 @@ function renderHome() {
       '<img class="home-logo-ribbon home-logo-ribbon--three" src="./assets/mynassistant-ribbon-3.webp?v=motion-v5" alt="" aria-hidden="true" fetchpriority="high">' +
       '<img class="home-logo-center" src="./assets/mynassistant-center-medallion.webp?v=motion-v5" alt="MynAssistant merkez madalyonu" fetchpriority="high">' +
     '</div>' +
-    '<div class="home-command-copy"><div class="eyebrow">KOMUT MERKEZİ</div>' +
-      '<h1>Sana nasıl yardımcı olabilirim?</h1>' +
-      '<p>Telefonuna veya bilgisayarına komut ver; hedefi sen seç veya otomatik yönlendirmeyi kullan.</p></div>' +
-    (state.feedback ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : "") +
-    '</section>';
+    '<div class="home-command-copy"><div class="eyebrow">' + (chatMode ? "YAPAY ZEKÂ SOHBETİ" : "KOMUT MERKEZİ") + '</div>' +
+      '<h1>' + (chatMode ? "Sana nasıl yardımcı olabilirim?" : "Cihazlarına komut gönder.") + '</h1>' +
+      '<p>' + (chatMode ? "Sorularını yanıtlayabilir, fikir geliştirebilir ve kodlama konusunda yardımcı olabilirim." : "Hedef cihazını seç ve desteklenen komutları güvenli şekilde gönder.") + '</p></div>' +
+    (state.feedback && !chatMode ? '<p class="home-feedback" role="status">' + esc(state.feedback) + '</p>' : "") +
+    '</section>' + renderAssistantConversation();
 }
 
 function renderAuth() {
@@ -701,19 +727,32 @@ function renderDiagnostics() {
 
 function renderComposer() {
   if (state.page !== "home") return "";
+  const chatMode = state.composerMode === "chat";
   const pc = currentDevice();
   const selectedAndroid = androidDevices().find(device => device.id === state.selectedAndroidDeviceId);
   const targetDescription = state.commandTargetId === "PC" ? (pc ? deviceDisplayName(pc) : "Windows bilgisayar bekleniyor") :
     state.commandTargetId === "ANDROID" ? (selectedAndroid ? deviceDisplayName(selectedAndroid) : "Android cihaz seçilmedi") :
     state.commandTargetId === "PHONE" ? "Bu telefon (Android)" : "Komuta göre telefon veya kullanılabilir bilgisayar";
-  return '<div class="composer-wrap"><form class="composer android-composer" id="command-form">' +
-    '<div class="composer-top"><button type="button" class="composer-target" data-action="open-target-picker">' + icon("plus") + '<span>' + esc(commandTargetLabel()) + '</span><span class="target-chevron">⌄</span></button><span class="muted tiny composer-target-description">' + esc(targetDescription) + '</span></div>' +
-    '<div class="composer-input-row"><input class="composer-input" id="command-input" maxlength="1000" autocomplete="off" placeholder="Komut yaz…" value="' + esc(state.commandText) + '" ' + (state.busy ? "disabled" : "") + '>' +
-    '<button type="button" class="round-action" data-action="speech-start" title="Sesli komut" ' + (("SpeechRecognition" in window || "webkitSpeechRecognition" in window) ? "" : "disabled") + '>' + icon("mic") + '</button>' +
-    '<button type="submit" class="round-action primary" aria-label="Komutu gönder" ' + (state.busy ? "disabled" : "") + '>' + icon("send") + '</button></div>' +
+  const sending = chatMode ? state.assistantBusy : state.busy;
+  const maxLength = chatMode ? 4000 : 1000;
+  const placeholder = chatMode ? "MynAssistant'a bir soru sor…" : "Cihazına komut ver…";
+  return '<div class="composer-wrap">' +
+    '<div class="composer-mode-row" role="group" aria-label="Giriş modu">' +
+      '<button type="button" class="composer-mode ' + (chatMode ? "active" : "") + '" data-action="set-composer-mode" data-mode="chat" aria-pressed="' + chatMode + '">Soru sor</button>' +
+      '<button type="button" class="composer-mode ' + (!chatMode ? "active" : "") + '" data-action="set-composer-mode" data-mode="command" aria-pressed="' + !chatMode + '">Cihaz komutu</button>' +
+    '</div>' +
+    '<form class="composer android-composer" id="command-form">' +
+      (chatMode
+        ? '<div class="composer-top"><span class="composer-context-label">MynAssistant • Genel sohbet</span></div>'
+        : '<div class="composer-top"><button type="button" class="composer-target" data-action="open-target-picker">' + icon("plus") + '<span>' + esc(commandTargetLabel()) + '</span><span class="target-chevron">⌄</span></button><span class="muted tiny composer-target-description">' + esc(targetDescription) + '</span></div>') +
+      '<div class="composer-input-row"><input class="composer-input" id="command-input" maxlength="' + maxLength + '" autocomplete="off" placeholder="' + placeholder + '" value="' + esc(state.commandText) + '" ' + (sending ? "disabled" : "") + '>' +
+      '<button type="button" class="round-action" data-action="speech-start" title="Sesli giriş" ' + (("SpeechRecognition" in window || "webkitSpeechRecognition" in window) ? "" : "disabled") + '>' + icon("mic") + '</button>' +
+      '<button type="submit" class="round-action primary" aria-label="' + (chatMode ? "Soruyu gönder" : "Komutu gönder") + '" ' + (sending ? "disabled" : "") + '>' + icon("send") + '</button></div>' +
     '</form>' +
-    (!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Bulut cihazlarına komut göndermek için MynAssistant hesabına giriş yap.</p>' : "") +
-    (state.feedback ? '<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">' + esc(state.feedback) + '</p>' : "") +
+    (chatMode
+      ? '<p class="muted tiny composer-hint">' + (state.user ? "Sohbet geçmişi bu oturum boyunca tutulur." : "Soru-cevap özelliği için giriş yapman gerekir.") + '</p>'
+      : (!state.user ? '<p class="muted tiny" style="text-align:center;margin:7px 0 0">Bulut cihazlarına komut göndermek için MynAssistant hesabına giriş yap.</p>' : "")) +
+    (!chatMode && state.feedback ? '<p class="muted tiny" role="status" style="text-align:center;margin:7px 0 0">' + esc(state.feedback) + '</p>' : "") +
     '</div>';
 }
 
@@ -756,6 +795,8 @@ function render() {
     ${renderDrawer()}
     ${renderTargetDialog()}
   `;
+  const chatMessages = document.getElementById("assistant-chat-messages");
+  if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function subscribeDevices() {
@@ -965,6 +1006,62 @@ async function sendTextCommand(raw) {
   state.commandTargetId = androidTarget ? "ANDROID" : "PC";
   storageSet("myn-command-target", state.commandTargetId);
   try { await enqueueCommand(device,"text_command",{text:commandText}); } catch {}
+}
+
+async function sendAssistantMessage(raw) {
+  const content = String(raw || "").trim();
+  if (!content) { showToast("Önce bir soru yaz."); return; }
+  if (content.length > 4000) { showToast("Soru en fazla 4.000 karakter olabilir."); return; }
+  if (!state.user) {
+    state.feedback = "Soru-cevap özelliği için MynAssistant hesabına giriş yap.";
+    navigate("auth");
+    return;
+  }
+  if (state.assistantBusy) return;
+
+  state.assistantMessages.push({role:"user",content});
+  state.assistantMessages = state.assistantMessages.slice(-40);
+  state.commandText = "";
+  state.assistantError = "";
+  state.assistantBusy = true;
+  render();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 72_000);
+  try {
+    const token = await state.user.getIdToken(false);
+    if (!token) throw new Error("MynAssistant oturumu doğrulanamadı. Yeniden giriş yap.");
+    const messages = state.assistantMessages.slice(-12).map(message => ({
+      role: message.role === "assistant" ? "assistant" : "user",
+      content: message.content
+    }));
+    const response = await fetch("https://mynassistant-server.onrender.com/api/v1/assistant/chat", {
+      method:"POST",
+      signal:controller.signal,
+      headers:{Accept:"application/json","Content-Type":"application/json",Authorization:"Bearer "+token},
+      body:JSON.stringify({messages})
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (response.status === 401) throw new Error("Oturum doğrulanamadı. Çıkış yapıp tekrar giriş yap.");
+      if (response.status === 429) throw new Error(body.detail || "Çok fazla soru gönderildi. Biraz bekleyip tekrar dene.");
+      if (response.status === 503) throw new Error(body.detail || "Yapay zekâ servisi henüz yapılandırılmadı.");
+      throw new Error(body.detail || body.title || "MynAssistant yanıt veremedi (HTTP " + response.status + ").");
+    }
+    const reply = typeof body.reply === "string" ? body.reply.trim() : "";
+    if (!reply) throw new Error("Sunucudan boş yanıt geldi. Tekrar deneyebilirsin.");
+    state.assistantMessages.push({role:"assistant",content:reply});
+    state.assistantMessages = state.assistantMessages.slice(-40);
+  } catch(error) {
+    state.assistantError = error?.name === "AbortError"
+      ? "Yanıt zaman aşımına uğradı. Tekrar deneyebilirsin."
+      : error?.message || "MynAssistant'a bağlanılamadı. İnternet bağlantını kontrol et.";
+    logIssue("MYN-WEB-CHAT-001","Yapay zekâ sohbeti",state.assistantError,error?.name || "");
+  } finally {
+    clearTimeout(timeout);
+    state.assistantBusy = false;
+    render();
+  }
 }
 
 async function startScreenPreview() {
@@ -1372,6 +1469,13 @@ document.addEventListener("click", async event => {
     else if (action === "toggle-remote-touchpad") { state.remoteTouchpadEnabled=!state.remoteTouchpadEnabled; storageSet("myn-remote-touchpad",state.remoteTouchpadEnabled); render(); }
     else if (action === "toggle-remote-keyboard") { state.remoteKeyboardEnabled=!state.remoteKeyboardEnabled; storageSet("myn-remote-keyboard",state.remoteKeyboardEnabled); render(); }
     else if (action === "approve-desktop-pairing") { await approveDesktopPairing(); }
+    else if (action === "set-composer-mode") {
+      const mode = button.dataset.mode;
+      if (mode === "chat" || mode === "command") {
+        state.composerMode = mode; storageSet("myn-composer-mode",mode);
+        state.commandText = ""; state.feedback = ""; state.assistantError = ""; render();
+      }
+    }
     else if (action === "toggle-theme") { setTheme(state.theme==="dark"?"light":"dark"); render(); }
     else if (action === "toggle-auth") { state.authMode=state.authMode==="register"?"login":"register"; state.feedback=""; render(); }
     else if (action === "google-login") { try { await googleLogin(); } catch(error) { state.feedback=friendlyAuthError(error,"google"); logIssue("MYN-WEB-AUTH-003","Google girişi",state.feedback,error?.code || ""); render(); } }
@@ -1457,7 +1561,8 @@ document.addEventListener("submit", async event => {
   } else if (event.target.id==="command-form") {
     event.preventDefault();
     state.commandText=document.getElementById("command-input")?.value || "";
-    await sendTextCommand(state.commandText);
+    if (state.composerMode === "chat") await sendAssistantMessage(state.commandText);
+    else await sendTextCommand(state.commandText);
   }
 });
 document.addEventListener("change", async event => {
