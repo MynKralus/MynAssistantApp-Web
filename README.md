@@ -31,3 +31,8 @@ Ana sayfada giriş yaptıktan sonra **Soru sor** moduyla genel yapay zekâ sohbe
 - Son 8 sohbet ve sohbet başına son 40 mesaj saklanır. Yapay zekâ isteğine bağlam olarak son 12 mesaj gönderilir.
 - Sohbet seçiciyle önceki oturuma dönülebilir; **Yeni sohbet** bağlamı sıfırlar, **Sil** yalnızca seçili yerel sohbeti siler.
 - Bu kayıtlar Render sunucusuna veya Firestore'a yüklenmez ve başka cihazlarla eşitlenmez. Tarayıcı verisi temizlenirse yerel geçmiş de silinir.
+
+
+## Arayüz ve ayarlar
+
+Ayarlar masaüstünde dikey kategori menüsü, küçük ekranlarda yatay kaydırılabilir sekmeler kullanır. Standart buton ikonları sabit boyutlandırılır; sohbet ana sayfasında karşılama alanı mesajlaşma başlayınca kompakt başlığa dönüşür.
