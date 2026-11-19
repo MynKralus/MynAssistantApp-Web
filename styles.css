@@ -879,7 +879,13 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   .home-logo-motion-stage { width: clamp(205px, 64vw, 270px); border-radius: 23px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-logo-ribbon, .home-logo-center, .home-logo-halo { animation: none !important; }
+  /* Keep the requested logo rotation visible, but slow it down for reduced-motion users. */
+  .home-logo-ribbon--one { animation-duration: 30s; }
+  .home-logo-ribbon--two { animation-duration: 34s; }
+  .home-logo-ribbon--three { animation-duration: 38s; }
+  .home-logo-center { animation-duration: 3.5s; }
+  .home-logo-halo { animation: none !important; }
+  .assistant-chat-typing span { animation: none !important; }
 }
 
 /* Web assistant chat and explicit chat/device-command mode separation */
