@@ -927,6 +927,50 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
   margin: 0 auto 16px;
   padding: 0 2px;
 }
+.assistant-chat-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 3px 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.assistant-chat-session-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.assistant-chat-session-meta strong {
+  color: var(--text);
+  font-size: 11px;
+}
+.assistant-chat-session-meta span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.assistant-chat-session-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.assistant-chat-session-select {
+  width: min(280px, 32vw);
+  min-width: 130px;
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 10px;
+}
+.assistant-chat-session-actions .small-button {
+  min-height: 34px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
 .assistant-chat-messages {
   max-height: min(34vh, 330px);
   min-height: 90px;
@@ -1030,6 +1074,10 @@ body.light-theme .hero-card { background: linear-gradient(145deg, #fff, #f0f2ff)
 body.light-theme .assistant-chat-empty,
 body.light-theme .assistant-message { background: var(--panel); }
 @media (max-width: 600px) {
+  .assistant-chat-toolbar { align-items: stretch; flex-direction: column; gap: 8px; }
+  .assistant-chat-session-actions { display: grid; grid-template-columns: minmax(0,1fr) auto auto; }
+  .assistant-chat-session-select { width: 100%; min-width: 0; max-width: 100%; }
+  .assistant-chat-session-actions .small-button { padding-inline: 8px; }
   .composer-wrap { padding-inline: 16px; }
   .assistant-chat-panel { padding-inline: 2px; }
   .assistant-chat-messages { max-height: min(36vh, 290px); }
