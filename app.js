@@ -433,7 +433,8 @@ function renderAssistantConversation() {
 
 function renderHome() {
   const chatMode = state.composerMode === "chat";
-  return '<section class="home-command-stage" aria-label="MynAssistant komut merkezi">' +
+  const hasConversation = chatMode && state.assistantMessages.length > 0;
+  return '<section class="home-command-stage ' + (hasConversation ? "has-messages" : "welcome-state") + '" aria-label="MynAssistant komut merkezi">' +
     '<div class="home-logo-motion-stage" data-state="' + (state.speechBusy ? "listening" : "idle") + '" aria-label="Katmanlı MynAssistant logosu">' +
       '<div class="home-logo-halo" aria-hidden="true"></div>' +
       '<img class="home-logo-ribbon home-logo-ribbon--one" src="./assets/mynassistant-ribbon-1.webp?v=motion-v5" alt="" aria-hidden="true" fetchpriority="high">' +
@@ -818,58 +819,204 @@ function renderDesktopPairingCard() {
 
 function renderSettings() {
   const tab = state.settingsTab;
+  const tabDescriptions = {
+    "Genel": "Görünüm ve uygulama tercihleri",
+    "Agent": "Windows bağlantı durumu",
+    "Hesap": "Hesap ve cihaz eşleştirme",
+    "İzinler": "Tarayıcı izinleri ve destek",
+    "Eklentiler": "Web özellikleri ve entegrasyonlar",
+    "Başlangıç": "Sesli giriş davranışı",
+    "Hata günlükleri": "Tanılama ve hata kayıtları"
+  };
   let body = "";
+
   if (tab === "Genel") {
     body = `
-      <section class="card">
-        <div class="row between"><div><h3>Görünüm</h3><p>Tema tercihi bu tarayıcıda saklanır.</p></div><button class="button secondary" data-action="toggle-theme">${icon(state.theme==="dark"?"sun":"moon")} ${state.theme==="dark"?"Açık tema":"Koyu tema"}</button></div>
+      <section class="settings-card">
+        <div class="settings-option">
+          <div class="settings-option-copy">
+            <strong>Görünüm</strong>
+            <span>Tema tercihi yalnızca bu tarayıcıda saklanır.</span>
+          </div>
+          <button class="button secondary small-button" type="button" data-action="toggle-theme">${icon(state.theme==="dark"?"sun":"moon")} ${state.theme==="dark"?"Açık tema":"Koyu tema"}</button>
+        </div>
       </section>
-      <section class="card compact"><h3>Uygulama bilgileri</h3><p>MynAssistant Web ${APP_VERSION}</p><p class="muted tiny">Android uygulaması: 0.6.3 • Web ayrı bir istemci uygulamasıdır.</p></section>`;
+      <section class="settings-card">
+        <div class="settings-option">
+          <div class="settings-option-copy">
+            <strong>Uygulama sürümü</strong>
+            <span>MynAssistant Web ${APP_VERSION}</span>
+          </div>
+          <span class="pill success">Güncel arayüz</span>
+        </div>
+        <p class="settings-note">Android uygulaması: 0.6.3. Web sürümü bağımsız bir istemcidir; Firebase hesabı ve cihaz verilerini ortak kullanır.</p>
+      </section>`;
   } else if (tab === "Agent") {
     const online = onlinePcDevices();
-    body = `<section class="card">
-      <h3>Windows Agent</h3>
-      <p>Windows uygulamasındaki Agent hesabınla aynı Firebase UID üzerinden bağlanır. Son 3 dakika içinde heartbeat gönderen bilgisayarlar çevrimiçi görünür.</p>
-      <div class="row between" style="margin-top:15px"><strong>Bağlantı durumu</strong><span class="pill ${online.length?"success":"warning"}">${online.length?"Çevrimiçi":"Bilgisayar bekleniyor"}</span></div>
-      <p>${online.length ? online.map(d=>esc(deviceDisplayName(d))).join(", ") : "Bu hesaba ait çevrimiçi Windows Agent bulunamadı."}</p>
-      <button class="button secondary full" data-page="devices" style="margin-top:12px">Cihazlarımı gör</button>
-      <button class="button ghost full" data-action="refresh-devices" style="margin-top:8px">Bağlantıyı yenile</button>
-    </section>
-    <section class="card"><h3>Bağlantı çalışma biçimi</h3><p>Komutlar mevcut Firebase cihaz/komut kuyruğu üzerinden gönderilir. Yönetici API’si bu kullanıcı bağlantısının yerine geçmez.</p></section>`;
-  } else if (tab === "Hesap") {
-    body = `<section class="card">
-      <p class="muted small">Oturum bu cihazda hatırlanıyor.</p>
-      ${renderDesktopPairingCard()}
-      <button class="button ghost full" data-page="${state.user?"account":"auth"}">${icon("user")} Hesap ve profil ayarları</button>
-    </section>`;
-  } else if (tab === "İzinler") {
     body = `
-      <p class="muted small">İzin durumları tarayıcıda geçerlidir. Android'e ait sistem izinleri web sayfasından yönetilemez.</p>
-      <div class="permission-row"><div class="row between"><strong>Mikrofon</strong><span class="pill" id="permission-microphone">Henüz sorulmadı</span></div><p>Yalnızca sen sesli komut başlattığında ve bu sekme açıkken kullanılır.</p><button class="button secondary small-button" data-action="request-microphone">Mikrofon iznini dene</button></div>
-      <div class="permission-row"><div class="row between"><strong>Bildirimler</strong><span class="pill" id="permission-notifications">${"Notification" in window?Notification.permission:"Desteklenmiyor"}</span></div><p>İşlem durumu bildirimleri için isteğe bağlıdır.</p><button class="button secondary small-button" data-action="request-notifications">Bildirim izni iste</button></div>
-      <div class="permission-row"><div class="row between"><strong>Kamera</strong><span class="pill" id="permission-camera">Henüz sorulmadı</span></div><p>Web sürümünde şu an kamera gerektiren etkin bir özellik yoktur.</p><button class="button secondary small-button" data-action="request-camera">Kamera iznini dene</button></div>
-      ${["Diğer uygulamaların üzerinde gösterme","Arka plan mikrofon servisi","Erişilebilirlik hizmeti","Telefon araması","Android kişiler","Tüm cihaz depolaması"].map(t=>`<div class="permission-row"><div class="row between"><strong>${t}</strong><span class="pill warning">Web'de kullanılamaz</span></div><p>Bu özellik Android uygulamasının işletim sistemi API'sine bağlıdır.</p></div>`).join("")}`;
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <div>
+            <h3>Windows Agent</h3>
+            <p>Windows uygulamasının bu hesaba gönderdiği son bağlantı sinyali.</p>
+          </div>
+          <span class="pill ${online.length?"success":"warning"}"><span class="status-dot ${online.length?"online":""}"></span>${online.length?"Çevrimiçi":"Bekleniyor"}</span>
+        </div>
+        <div class="settings-status-panel">
+          <strong>${online.length ? online.map(d=>esc(deviceDisplayName(d))).join(", ") : "Bağlı bilgisayar bulunamadı"}</strong>
+          <span>${online.length ? "Son 3 dakika içinde bağlantı sinyali alındı." : "Windows MynAssistant uygulamasında aynı Firebase hesabıyla oturum aç."}</span>
+        </div>
+        <div class="form-actions settings-actions">
+          <button class="button secondary small-button" type="button" data-page="devices">Cihazlarımı gör</button>
+          <button class="button ghost small-button" type="button" data-action="refresh-devices">${icon("refresh")} Yenile</button>
+        </div>
+      </section>
+      <section class="settings-card">
+        <h3>Bağlantı yöntemi</h3>
+        <p>Web istemcisi cihaz durumunu ve komut kuyruğunu mevcut Firebase/Firestore protokolü üzerinden kullanır. Yönetici API'si bu bağlantının yerine geçmez.</p>
+      </section>`;
+  } else if (tab === "Hesap") {
+    body = `
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <div>
+            <h3>Oturum ve eşleştirme</h3>
+            <p>Bu tarayıcıda açık olan MynAssistant hesabı ve cihaz bağlantısı.</p>
+          </div>
+          <span class="pill ${state.user?"success":"warning"}">${state.user?"Oturum açık":"Giriş gerekli"}</span>
+        </div>
+        ${renderDesktopPairingCard()}
+        <div class="settings-divider"></div>
+        <div class="settings-option">
+          <div class="settings-option-copy">
+            <strong>Profil ayarları</strong>
+            <span>E-posta, görünen ad ve hesap bilgileri.</span>
+          </div>
+          <button class="button secondary small-button" type="button" data-page="${state.user?"account":"auth"}">Hesabı aç</button>
+        </div>
+      </section>`;
+  } else if (tab === "İzinler") {
+    const unsupported = [
+      "Diğer uygulamaların üzerinde gösterme",
+      "Arka plan mikrofon servisi",
+      "Erişilebilirlik hizmeti",
+      "Telefon araması",
+      "Android kişiler",
+      "Tüm cihaz depolaması"
+    ];
+    body = `
+      <p class="settings-intro">Bu izinler yalnızca web tarayıcısının desteklediği özellikler için istenir. Android'e özel sistem izinleri web sayfasından yönetilemez.</p>
+      <section class="settings-card settings-permission-list">
+        <div class="settings-permission-row">
+          <div class="settings-option-copy">
+            <strong>Mikrofon</strong>
+            <span>Yalnızca sesli giriş başlatıldığında kullanılır.</span>
+          </div>
+          <div class="settings-row-actions">
+            <span class="pill" id="permission-microphone">Kontrol edilmedi</span>
+            <button class="button secondary small-button" type="button" data-action="request-microphone">İzin ver</button>
+          </div>
+        </div>
+        <div class="settings-permission-row">
+          <div class="settings-option-copy">
+            <strong>Bildirimler</strong>
+            <span>İşlem durumu bildirimleri için isteğe bağlıdır.</span>
+          </div>
+          <div class="settings-row-actions">
+            <span class="pill" id="permission-notifications">${"Notification" in window?Notification.permission:"Desteklenmiyor"}</span>
+            <button class="button secondary small-button" type="button" data-action="request-notifications">İzin ver</button>
+          </div>
+        </div>
+        <div class="settings-permission-row">
+          <div class="settings-option-copy">
+            <strong>Kamera</strong>
+            <span>Web sürümünde şu an kamera gerektiren etkin bir özellik yoktur.</span>
+          </div>
+          <div class="settings-row-actions">
+            <span class="pill" id="permission-camera">Kontrol edilmedi</span>
+            <button class="button secondary small-button" type="button" data-action="request-camera">İzin ver</button>
+          </div>
+        </div>
+      </section>
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <div>
+            <h3>Android'e özel izinler</h3>
+            <p>Bu izinler web tarayıcısında kullanılamaz.</p>
+          </div>
+          <span class="pill warning">Android uygulaması</span>
+        </div>
+        <div class="settings-chip-list">${unsupported.map(item=>'<span class="settings-chip">'+esc(item)+'</span>').join("")}</div>
+      </section>`;
   } else if (tab === "Eklentiler") {
     body = `
-      <section class="card"><h3>WhatsApp otomatik işlemleri</h3><p>Android sürümünde kullanıcı tarafından ayrıca etkinleştirilen erişilebilirlik hizmeti kullanılır. Web sayfası başka uygulamaların arayüzüne müdahale edemez.</p><span class="pill warning">Android'e özel</span></section>
-      <section class="card"><h3>Sesli komut</h3><p>Tarayıcı destekliyorsa Web Speech API üzerinden kullanıcı başlatmalı ses tanıma kullanılabilir.</p><button class="button secondary full" data-action="speech-start">${icon("mic")} Sesli komutu başlat</button></section>`;
+      <section class="settings-card">
+        <div class="settings-option">
+          <div class="settings-option-copy">
+            <strong>WhatsApp otomatik işlemleri</strong>
+            <span>Otomatik işlemler Android uygulamasındaki kullanıcı kontrollü erişilebilirlik hizmetine bağlıdır. Web sayfası başka uygulamaların arayüzüne müdahale edemez.</span>
+          </div>
+          <span class="pill warning">Android'e özel</span>
+        </div>
+      </section>
+      <section class="settings-card">
+        <div class="settings-option">
+          <div class="settings-option-copy">
+            <strong>Tarayıcıda sesli giriş</strong>
+            <span>Desteklenen tarayıcılarda, sen başlattığında tek seferlik ses tanıma kullanılır.</span>
+          </div>
+          <button class="button secondary small-button" type="button" data-action="speech-start">${icon("mic")} Başlat</button>
+        </div>
+      </section>`;
   } else if (tab === "Başlangıç") {
     body = `
-      <section class="card">
-        <div class="row"><div class="device-icon">${icon("mic")}</div><div class="device-info"><strong>Hey Meyene</strong><span>Web Speech API • kullanıcı başlatmalı</span></div><span class="pill warning">Sürekli dinleme yok</span></div>
-        <p>Tarayıcı, kullanıcının açıkça başlattığı tek seferlik ses tanıma oturumunu destekleyebilir. Android'deki çevrimdışı uyandırma motoru, kalıcı mikrofon servisi ve yüzen panel web sayfasına taşınamaz.</p>
-        <button class="button full" data-action="speech-start" style="margin-top:14px">${icon("mic")} Dinlemeyi başlat</button>
+      <section class="settings-card">
+        <div class="settings-feature">
+          <div class="settings-feature-icon">${icon("mic")}</div>
+          <div class="settings-feature-copy">
+            <strong>Hey Meyene</strong>
+            <span>Tarayıcı tabanlı, kullanıcı başlatmalı sesli giriş.</span>
+          </div>
+          <span class="pill warning">Sürekli dinleme yok</span>
+        </div>
+        <p class="settings-note">Web Speech API yalnızca sen başlattığında çalışır. Tarayıcı arka plana alındığında veya sekme kapatıldığında dinleme durabilir. Android'deki çevrimdışı uyandırma motoru ve yüzen panel web sayfasına taşınamaz.</p>
+        <div class="form-actions settings-actions">
+          <button class="button secondary small-button" type="button" data-action="speech-start">${icon("mic")} Dinlemeyi başlat</button>
+        </div>
       </section>
-      <div class="notice warning">Tarayıcı veya işletim sistemi sekme arka plana alındığında mikrofonu durdurabilir. Bu özellik Android'deki “Hey Meyene” ile eşdeğer değildir.</div>`;
+      <div class="notice warning settings-notice">Sürekli arka plan dinleme bu web sürümünde desteklenmez. Mikrofon yalnızca açık ve kullanıcı tarafından başlatılmış oturumda kullanılır.</div>`;
   } else if (tab === "Hata günlükleri") {
-    body = `<section class="card compact"><div class="row between"><div><h3>Web hata günlükleri</h3><p>Son 80 kayıt bu tarayıcıda saklanır.</p></div><button class="button danger small-button" data-action="clear-logs">Temizle</button></div></section>
-      ${state.logs.length ? state.logs.map(l=>`<div class="log-row"><strong>${esc(l.id)} • ${esc(l.title)}</strong><span>${esc(fmtDate(l.at))}</span><p>${esc(l.message)}</p>${l.details?`<p>${esc(l.details)}</p>`:""}</div>`).join("") : '<div class="empty-state"><div class="empty-icon">' + icon("check") + '</div><strong>Henüz hata kaydı yok</strong><p>Web sürümünde oluşan hatalar burada listelenir.</p></div>'}
-      <button class="button secondary full" data-action="export-logs">Hata kayıtlarını JSON indir</button>`;
+    body = `
+      <section class="settings-card">
+        <div class="settings-card-heading">
+          <div>
+            <h3>Web hata günlükleri</h3>
+            <p>Son 80 kayıt yalnızca bu tarayıcıda saklanır.</p>
+          </div>
+          <span class="pill">${state.logs.length} kayıt</span>
+        </div>
+        <div class="form-actions settings-actions">
+          <button class="button secondary small-button" type="button" data-action="export-logs">JSON dışa aktar</button>
+          <button class="button danger small-button" type="button" data-action="clear-logs">Kayıtları temizle</button>
+        </div>
+      </section>
+      ${state.logs.length ? state.logs.map(l=>`<div class="log-row"><strong>${esc(l.id)} • ${esc(l.title)}</strong><span>${esc(fmtDate(l.at))}</span><p>${esc(l.message)}</p>${l.details?`<p>${esc(l.details)}</p>`:""}</div>`).join("") : '<div class="empty-state"><div class="empty-icon">' + icon("check") + '</div><strong>Henüz hata kaydı yok</strong><p>Web sürümünde bir hata oluşursa kayıtları burada görebilirsin.</p></div>'}`;
   }
+
   return `
-    ${renderHeading("Ayarlar","MynAssistant tercihlerini yönet.")}
-    <nav class="settings-tabs" aria-label="Ayarlar kategorileri">${SETTINGS_TABS.map(t=>`<button class="tab ${tab===t?"active":""}" data-tab="${esc(t)}">${esc(t)}</button>`).join("")}</nav>
-    <div class="section-stack">${body}</div>`;
+    ${renderHeading("Ayarlar","MynAssistant tercihleri ve bağlantı seçenekleri.")}
+    <div class="settings-layout">
+      <nav class="settings-tabs" aria-label="Ayarlar kategorileri">
+        ${SETTINGS_TABS.map(t=>'<button type="button" class="tab '+(tab===t?"active":"")+'" data-tab="'+esc(t)+'" aria-current="'+(tab===t?"page":"false")+'">'+esc(t)+'</button>').join("")}
+      </nav>
+      <div class="settings-content">
+        <div class="settings-content-heading">
+          <h2>${esc(tab)}</h2>
+          <p>${esc(tabDescriptions[tab] || "MynAssistant ayarları")}</p>
+        </div>
+        <div class="section-stack">${body}</div>
+      </div>
+    </div>`;
 }
 function renderDiagnostics() {
   return `
